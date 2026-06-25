@@ -15,6 +15,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTradeCreatorRouteImport } from './routes/_authenticated/trade-creator'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedTradeDetailIdRouteImport } from './routes/_authenticated/trade-detail.$id'
 
 const ResetPasswordRoute = ResetPasswordRouteImport.update({
   id: '/reset-password',
@@ -46,6 +47,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedTradeDetailIdRoute =
+  AuthenticatedTradeDetailIdRouteImport.update({
+    id: '/trade-detail/$id',
+    path: '/trade-detail/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -53,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/reset-password': typeof ResetPasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/trade-creator': typeof AuthenticatedTradeCreatorRoute
+  '/trade-detail/$id': typeof AuthenticatedTradeDetailIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -60,6 +68,7 @@ export interface FileRoutesByTo {
   '/reset-password': typeof ResetPasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/trade-creator': typeof AuthenticatedTradeCreatorRoute
+  '/trade-detail/$id': typeof AuthenticatedTradeDetailIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -69,12 +78,25 @@ export interface FileRoutesById {
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/trade-creator': typeof AuthenticatedTradeCreatorRoute
+  '/_authenticated/trade-detail/$id': typeof AuthenticatedTradeDetailIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/reset-password' | '/dashboard' | '/trade-creator'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/reset-password'
+    | '/dashboard'
+    | '/trade-creator'
+    | '/trade-detail/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/reset-password' | '/dashboard' | '/trade-creator'
+  to:
+    | '/'
+    | '/auth'
+    | '/reset-password'
+    | '/dashboard'
+    | '/trade-creator'
+    | '/trade-detail/$id'
   id:
     | '__root__'
     | '/'
@@ -83,6 +105,7 @@ export interface FileRouteTypes {
     | '/reset-password'
     | '/_authenticated/dashboard'
     | '/_authenticated/trade-creator'
+    | '/_authenticated/trade-detail/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -136,17 +159,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/trade-detail/$id': {
+      id: '/_authenticated/trade-detail/$id'
+      path: '/trade-detail/$id'
+      fullPath: '/trade-detail/$id'
+      preLoaderRoute: typeof AuthenticatedTradeDetailIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedTradeCreatorRoute: typeof AuthenticatedTradeCreatorRoute
+  AuthenticatedTradeDetailIdRoute: typeof AuthenticatedTradeDetailIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedTradeCreatorRoute: AuthenticatedTradeCreatorRoute,
+  AuthenticatedTradeDetailIdRoute: AuthenticatedTradeDetailIdRoute,
 }
 
 const AuthenticatedRouteRouteWithChildren =
