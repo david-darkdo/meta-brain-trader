@@ -5,8 +5,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Pencil, Trash2 } from "lucide-react";
+import { ArrowLeft, Pencil, Trash2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
+import { PipelineStatus } from "@/components/pipeline-status";
+import { AiAnalysesPanel } from "@/components/ai-analyses-panel";
 
 export const Route = createFileRoute("/_authenticated/trade-detail/$id")({
   head: () => ({ meta: [{ title: "Trade — MetaBrain Trader" }] }),
@@ -18,6 +20,8 @@ type Trade = {
   pair: string;
   direction: string;
   trade_status: string;
+  processing_step: string;
+  processing_error: string | null;
   entry_price: number | null;
   stop_loss: number | null;
   take_profit: number | null;
@@ -37,13 +41,46 @@ function TradeDetail() {
     queryFn: async (): Promise<Trade> => {
       const { data, error } = await supabase
         .from("trades")
-        .select("trade_id,pair,direction,trade_status,entry_price,stop_loss,take_profit,account_size,risk_pct,session,notes,created_at")
+        .select("trade_id,pair,direction,trade_status,processing_step,processing_error,entry_price,stop_loss,take_profit,account_size,risk_pct,session,notes,created_at")
         .eq("trade_id", id)
         .single();
       if (error) throw error;
       if (!data) throw notFound();
       return data as Trade;
     },
+  });
+
+  // Listen for trade row updates so trade_status / processing_step stay fresh
+  useEffect(() => {
+    const ch = supabase
+      .channel(`trade-${id}-row`)
+      .on(
+        "postgres_changes",
+        { event: "UPDATE", schema: "public", table: "trades", filter: `trade_id=eq.${id}` },
+        () => qc.invalidateQueries({ queryKey: ["trade", id] }),
+      )
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [id, qc]);
+
+  const startAnalysis = useMutation({
+    mutationFn: async () => {
+      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/orchestrate-pipeline`;
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+        },
+        body: JSON.stringify({ trade_id: id }),
+      });
+      if (!res.ok) throw new Error(await res.text());
+    },
+    onSuccess: () => {
+      toast.success("AI analysis started");
+      qc.invalidateQueries({ queryKey: ["trade", id] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
   const shotsQ = useQuery({
@@ -99,6 +136,8 @@ function TradeDetail() {
 
   const t = tradeQ.data;
   const editable = t.trade_status === "DRAFT";
+  const showPipeline =
+    t.trade_status !== "DRAFT" || t.processing_step !== "PENDING";
 
   return (
     <div className="space-y-6">
@@ -115,12 +154,25 @@ function TradeDetail() {
           </div>
           <p className="mt-1 text-sm text-muted-foreground">Created {new Date(t.created_at).toLocaleString()}</p>
         </div>
-        {editable && (
+        {editable ? (
+          <Button size="sm" className="gap-2" onClick={() => startAnalysis.mutate()} disabled={startAnalysis.isPending}>
+            <Sparkles className="h-4 w-4" />
+            {startAnalysis.isPending ? "Starting…" : "Run AI analysis"}
+          </Button>
+        ) : (
           <Button variant="outline" size="sm" disabled className="gap-2">
-            <Pencil className="h-4 w-4" /> Edit (coming soon)
+            <Pencil className="h-4 w-4" /> Locked (analysis ran)
           </Button>
         )}
       </div>
+
+      {showPipeline && (
+        <PipelineStatus
+          tradeId={t.trade_id}
+          initialStep={t.processing_step}
+          initialError={t.processing_error}
+        />
+      )}
 
       <Card>
         <CardHeader><CardTitle className="text-base">Trade plan</CardTitle></CardHeader>
