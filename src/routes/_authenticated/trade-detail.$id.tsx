@@ -219,6 +219,10 @@ function TradeDetail() {
         </CardContent>
       </Card>
 
+      <AiAnalysesPanel tradeId={t.trade_id} />
+
+
+
       <Card>
         <CardHeader><CardTitle className="text-base">Reflections</CardTitle></CardHeader>
         <CardContent className="space-y-4">
