@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, PlusCircle, UserCircle, LogOut } from "lucide-react";
+import { LayoutDashboard, PlusCircle, UserCircle, LogOut, BookMarked } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated")({
@@ -29,6 +29,7 @@ function AuthenticatedLayout() {
   const nav = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/trade-creator", label: "New trade", icon: PlusCircle },
+    { to: "/strategy-profiles", label: "Strategies", icon: BookMarked },
     { to: "/profile", label: "Profile", icon: UserCircle },
   ] as const;
 

@@ -21,6 +21,9 @@ export type Database = {
           coaching_notes: string | null
           created_at: string
           entry_score: number | null
+          model_name: string | null
+          model_provider: string | null
+          prompt_snapshot: string | null
           prompt_version_id: string | null
           stage: Database["public"]["Enums"]["analysis_stage"]
           trade_id: string
@@ -32,6 +35,9 @@ export type Database = {
           coaching_notes?: string | null
           created_at?: string
           entry_score?: number | null
+          model_name?: string | null
+          model_provider?: string | null
+          prompt_snapshot?: string | null
           prompt_version_id?: string | null
           stage: Database["public"]["Enums"]["analysis_stage"]
           trade_id: string
@@ -43,6 +49,9 @@ export type Database = {
           coaching_notes?: string | null
           created_at?: string
           entry_score?: number | null
+          model_name?: string | null
+          model_provider?: string | null
+          prompt_snapshot?: string | null
           prompt_version_id?: string | null
           stage?: Database["public"]["Enums"]["analysis_stage"]
           trade_id?: string
@@ -58,6 +67,53 @@ export type Database = {
           },
           {
             foreignKeyName: "ai_analyses_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["trade_id"]
+          },
+        ]
+      }
+      job_queue: {
+        Row: {
+          attempts: number
+          created_at: string
+          id: string
+          last_error: string | null
+          max_attempts: number
+          payload: Json
+          stage: Database["public"]["Enums"]["processing_step"]
+          status: Database["public"]["Enums"]["job_status"]
+          trade_id: string
+          updated_at: string
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          payload?: Json
+          stage: Database["public"]["Enums"]["processing_step"]
+          status?: Database["public"]["Enums"]["job_status"]
+          trade_id: string
+          updated_at?: string
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          max_attempts?: number
+          payload?: Json
+          stage?: Database["public"]["Enums"]["processing_step"]
+          status?: Database["public"]["Enums"]["job_status"]
+          trade_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "job_queue_trade_id_fkey"
             columns: ["trade_id"]
             isOneToOne: false
             referencedRelation: "trades"
@@ -227,14 +283,47 @@ export type Database = {
           },
         ]
       }
+      strategy_profiles: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          name: string
+          prompt_config: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name: string
+          prompt_config?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          name?: string
+          prompt_config?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       trades: {
         Row: {
           account_size: number | null
           created_at: string
+          current_strategy_profile_id: string | null
           direction: string
           entry_price: number | null
           notes: string | null
           pair: string
+          processing_error: string | null
+          processing_step: Database["public"]["Enums"]["processing_step"]
           risk_pct: number | null
           session: string | null
           stop_loss: number | null
@@ -248,10 +337,13 @@ export type Database = {
         Insert: {
           account_size?: number | null
           created_at?: string
+          current_strategy_profile_id?: string | null
           direction: string
           entry_price?: number | null
           notes?: string | null
           pair: string
+          processing_error?: string | null
+          processing_step?: Database["public"]["Enums"]["processing_step"]
           risk_pct?: number | null
           session?: string | null
           stop_loss?: number | null
@@ -265,10 +357,13 @@ export type Database = {
         Update: {
           account_size?: number | null
           created_at?: string
+          current_strategy_profile_id?: string | null
           direction?: string
           entry_price?: number | null
           notes?: string | null
           pair?: string
+          processing_error?: string | null
+          processing_step?: Database["public"]["Enums"]["processing_step"]
           risk_pct?: number | null
           session?: string | null
           stop_loss?: number | null
@@ -279,7 +374,15 @@ export type Database = {
           user_id?: string
           user_override?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "trades_current_strategy_profile_id_fkey"
+            columns: ["current_strategy_profile_id"]
+            isOneToOne: false
+            referencedRelation: "strategy_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       usage_logs: {
         Row: {
@@ -333,7 +436,19 @@ export type Database = {
     Enums: {
       analysis_stage: "BLIND" | "COMPARATIVE" | "VERDICT"
       analysis_type: "PRE" | "POST"
+      job_status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED"
       outcome_type: "WIN" | "LOSS" | "BREAKEVEN" | "CANCELLED"
+      processing_step:
+        | "PENDING"
+        | "BLIND"
+        | "STRATEGY"
+        | "VALIDATION"
+        | "LEARNING"
+        | "VERDICT"
+        | "EDUCATION"
+        | "COACH"
+        | "COMPLETED"
+        | "FAILED"
       prompt_type: "PRE" | "POST" | "VERDICT" | "COACHING"
       subscription_tier: "FREE" | "PRO" | "ELITE"
       trade_status:
@@ -475,7 +590,20 @@ export const Constants = {
     Enums: {
       analysis_stage: ["BLIND", "COMPARATIVE", "VERDICT"],
       analysis_type: ["PRE", "POST"],
+      job_status: ["QUEUED", "RUNNING", "SUCCEEDED", "FAILED"],
       outcome_type: ["WIN", "LOSS", "BREAKEVEN", "CANCELLED"],
+      processing_step: [
+        "PENDING",
+        "BLIND",
+        "STRATEGY",
+        "VALIDATION",
+        "LEARNING",
+        "VERDICT",
+        "EDUCATION",
+        "COACH",
+        "COMPLETED",
+        "FAILED",
+      ],
       prompt_type: ["PRE", "POST", "VERDICT", "COACHING"],
       subscription_tier: ["FREE", "PRO", "ELITE"],
       trade_status: [
