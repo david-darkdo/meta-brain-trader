@@ -1,0 +1,1 @@
+REVOKE EXECUTE ON FUNCTION public.snapshot_reflection_version() FROM PUBLIC, anon, authenticated;
