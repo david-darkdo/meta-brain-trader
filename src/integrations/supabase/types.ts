@@ -121,6 +121,39 @@ export type Database = {
           },
         ]
       }
+      learning_insights: {
+        Row: {
+          category: Database["public"]["Enums"]["insight_category"]
+          content: string
+          created_at: string
+          id: string
+          occurrences: number
+          referenced_trade_ids: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["insight_category"]
+          content: string
+          created_at?: string
+          id?: string
+          occurrences?: number
+          referenced_trade_ids?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["insight_category"]
+          content?: string
+          created_at?: string
+          id?: string
+          occurrences?: number
+          referenced_trade_ids?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profile_settings: {
         Row: {
           created_at: string
@@ -172,12 +205,48 @@ export type Database = {
         }
         Relationships: []
       }
+      reflection_versions: {
+        Row: {
+          content: string
+          created_at: string
+          id: string
+          reflection_id: string
+          trade_id: string
+          version: number
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          id?: string
+          reflection_id: string
+          trade_id: string
+          version: number
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          id?: string
+          reflection_id?: string
+          trade_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reflection_versions_reflection_id_fkey"
+            columns: ["reflection_id"]
+            isOneToOne: false
+            referencedRelation: "reflections"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       reflections: {
         Row: {
           content: string
           created_at: string
           id: string
           is_lesson: boolean
+          section_type: Database["public"]["Enums"]["reflection_section"]
           trade_id: string
           updated_at: string
         }
@@ -186,6 +255,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_lesson?: boolean
+          section_type?: Database["public"]["Enums"]["reflection_section"]
           trade_id: string
           updated_at?: string
         }
@@ -194,6 +264,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_lesson?: boolean
+          section_type?: Database["public"]["Enums"]["reflection_section"]
           trade_id?: string
           updated_at?: string
         }
@@ -214,7 +285,11 @@ export type Database = {
           created_at: string
           id: string
           outcome: Database["public"]["Enums"]["outcome_type"]
+          pnl_amount: number | null
+          pnl_percent: number | null
           result_notes: string | null
+          rr_achieved: number | null
+          trade_duration: string | null
           trade_id: string
         }
         Insert: {
@@ -223,7 +298,11 @@ export type Database = {
           created_at?: string
           id?: string
           outcome: Database["public"]["Enums"]["outcome_type"]
+          pnl_amount?: number | null
+          pnl_percent?: number | null
           result_notes?: string | null
+          rr_achieved?: number | null
+          trade_duration?: string | null
           trade_id: string
         }
         Update: {
@@ -232,7 +311,11 @@ export type Database = {
           created_at?: string
           id?: string
           outcome?: Database["public"]["Enums"]["outcome_type"]
+          pnl_amount?: number | null
+          pnl_percent?: number | null
           result_notes?: string | null
+          rr_achieved?: number | null
+          trade_duration?: string | null
           trade_id?: string
         }
         Relationships: [
@@ -428,7 +511,22 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      dashboard_metrics: {
+        Row: {
+          ai_agreement_score: number | null
+          avg_rr: number | null
+          closed_trades: number | null
+          discipline_score: number | null
+          losses: number | null
+          most_common_mistake: string | null
+          most_profitable_behavior: string | null
+          total_pnl: number | null
+          user_id: string | null
+          win_rate: number | null
+          wins: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       owns_trade: { Args: { _trade_id: string }; Returns: boolean }
@@ -436,6 +534,7 @@ export type Database = {
     Enums: {
       analysis_stage: "BLIND" | "COMPARATIVE" | "VERDICT"
       analysis_type: "PRE" | "POST"
+      insight_category: "MISTAKE" | "STRENGTH" | "PATTERN" | "NOTE"
       job_status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED"
       outcome_type: "WIN" | "LOSS" | "BREAKEVEN" | "CANCELLED"
       processing_step:
@@ -449,7 +548,23 @@ export type Database = {
         | "COACH"
         | "COMPLETED"
         | "FAILED"
+        | "POST_PENDING"
+        | "POST_REVIEW"
+        | "POST_MISTAKE"
+        | "POST_PERFORMANCE"
+        | "POST_LEARNING"
+        | "POST_COACH"
+        | "POST_COMPLETED"
+        | "POST_FAILED"
       prompt_type: "PRE" | "POST" | "VERDICT" | "COACHING"
+      reflection_section:
+        | "WHAT_I_SAW"
+        | "WHAT_I_FELT"
+        | "WHAT_I_DID_RIGHT"
+        | "WHAT_I_DID_WRONG"
+        | "WHAT_I_LEARNED"
+        | "PROMISE_TO_MYSELF"
+        | "GENERAL"
       subscription_tier: "FREE" | "PRO" | "ELITE"
       trade_status:
         | "DRAFT"
@@ -590,6 +705,7 @@ export const Constants = {
     Enums: {
       analysis_stage: ["BLIND", "COMPARATIVE", "VERDICT"],
       analysis_type: ["PRE", "POST"],
+      insight_category: ["MISTAKE", "STRENGTH", "PATTERN", "NOTE"],
       job_status: ["QUEUED", "RUNNING", "SUCCEEDED", "FAILED"],
       outcome_type: ["WIN", "LOSS", "BREAKEVEN", "CANCELLED"],
       processing_step: [
@@ -603,8 +719,25 @@ export const Constants = {
         "COACH",
         "COMPLETED",
         "FAILED",
+        "POST_PENDING",
+        "POST_REVIEW",
+        "POST_MISTAKE",
+        "POST_PERFORMANCE",
+        "POST_LEARNING",
+        "POST_COACH",
+        "POST_COMPLETED",
+        "POST_FAILED",
       ],
       prompt_type: ["PRE", "POST", "VERDICT", "COACHING"],
+      reflection_section: [
+        "WHAT_I_SAW",
+        "WHAT_I_FELT",
+        "WHAT_I_DID_RIGHT",
+        "WHAT_I_DID_WRONG",
+        "WHAT_I_LEARNED",
+        "PROMISE_TO_MYSELF",
+        "GENERAL",
+      ],
       subscription_tier: ["FREE", "PRO", "ELITE"],
       trade_status: [
         "DRAFT",
