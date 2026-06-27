@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { TrendingUp, BarChart3, Target, BookOpen, Plus } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { TrendingUp, BarChart3, Target, BookOpen, Plus, AlertTriangle, Trophy } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — MetaBrain Trader" }] }),
@@ -11,7 +12,7 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
-  const { data: trades } = useQuery({
+  const tradesQ = useQuery({
     queryKey: ["trades", "recent"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -24,11 +25,32 @@ function Dashboard() {
     },
   });
 
+  const metricsQ = useQuery({
+    queryKey: ["dashboard_metrics"],
+    queryFn: async () => {
+      const { data } = await supabase.from("dashboard_metrics").select("*").maybeSingle();
+      return data;
+    },
+  });
+
+  const insightsQ = useQuery({
+    queryKey: ["learning_insights", "top"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("learning_insights")
+        .select("id,category,content,occurrences,updated_at")
+        .order("occurrences", { ascending: false })
+        .limit(10);
+      return data ?? [];
+    },
+  });
+
+  const m = metricsQ.data;
   const stats = [
-    { label: "Total trades", value: trades?.length ?? 0, icon: BarChart3 },
-    { label: "Win rate", value: "—", icon: TrendingUp, hint: "Coming soon" },
-    { label: "Avg R", value: "—", icon: Target, hint: "Coming soon" },
-    { label: "Lessons logged", value: "—", icon: BookOpen, hint: "Coming soon" },
+    { label: "Closed trades", value: m?.closed_trades ?? 0, icon: BarChart3 },
+    { label: "Win rate", value: m ? `${m.win_rate}%` : "—", icon: TrendingUp },
+    { label: "Avg R", value: m ? m.avg_rr : "—", icon: Target },
+    { label: "Discipline", value: m ? `${m.discipline_score}` : "—", icon: BookOpen },
   ];
 
   return (
@@ -52,18 +74,63 @@ function Dashboard() {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{s.value}</div>
-              {s.hint && <p className="text-xs text-muted-foreground">{s.hint}</p>}
             </CardContent>
           </Card>
         ))}
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2">
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <AlertTriangle className="h-4 w-4 text-destructive" /> Most common mistake
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-medium">{m?.most_common_mistake ?? "No data yet"}</p>
+            <p className="text-xs text-muted-foreground mt-1">From the learning memory engine</p>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Trophy className="h-4 w-4 text-success" /> Most profitable behavior
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-lg font-medium">{m?.most_profitable_behavior ?? "No data yet"}</p>
+            <p className="text-xs text-muted-foreground mt-1">Recurring strength across recent trades</p>
+          </CardContent>
+        </Card>
+      </div>
+
       <Card>
-        <CardHeader>
-          <CardTitle>Recent trades</CardTitle>
-        </CardHeader>
+        <CardHeader><CardTitle className="text-base">Learning insights</CardTitle></CardHeader>
         <CardContent>
-          {!trades || trades.length === 0 ? (
+          {!insightsQ.data || insightsQ.data.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Insights will appear after your first post-trade analysis runs.</p>
+          ) : (
+            <ul className="space-y-2">
+              {insightsQ.data.map((i) => (
+                <li key={i.id} className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={i.category === "MISTAKE" ? "destructive" : i.category === "STRENGTH" ? "default" : "secondary"}>
+                      {i.category}
+                    </Badge>
+                    <span className="text-sm">{i.content}</span>
+                  </div>
+                  <span className="text-xs text-muted-foreground">×{i.occurrences}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>Recent trades</CardTitle></CardHeader>
+        <CardContent>
+          {!tradesQ.data || tradesQ.data.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border p-10 text-center">
               <p className="text-sm text-muted-foreground">No trades yet.</p>
               <Button asChild className="mt-4">
@@ -72,7 +139,7 @@ function Dashboard() {
             </div>
           ) : (
             <ul className="divide-y divide-border">
-              {trades.map((t) => (
+              {tradesQ.data.map((t) => (
                 <li key={t.trade_id}>
                   <Link
                     to="/trade-detail/$id"
@@ -92,15 +159,6 @@ function Dashboard() {
               ))}
             </ul>
           )}
-        </CardContent>
-      </Card>
-
-      <Card className="border-dashed">
-        <CardHeader><CardTitle className="text-base">Performance trends</CardTitle></CardHeader>
-        <CardContent>
-          <div className="flex h-40 items-center justify-center text-sm text-muted-foreground">
-            Charts will appear here once you log results.
-          </div>
         </CardContent>
       </Card>
     </div>

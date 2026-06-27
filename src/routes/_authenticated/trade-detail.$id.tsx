@@ -1,14 +1,16 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Pencil, Trash2, Sparkles } from "lucide-react";
+import { ArrowLeft, Sparkles, Brain } from "lucide-react";
 import { toast } from "sonner";
 import { PipelineStatus } from "@/components/pipeline-status";
+import { PostPipelineStatus } from "@/components/post-pipeline-status";
 import { AiAnalysesPanel } from "@/components/ai-analyses-panel";
+import { ResultForm } from "@/components/result-form";
+import { ReflectionSections } from "@/components/reflection-sections";
 
 export const Route = createFileRoute("/_authenticated/trade-detail/$id")({
   head: () => ({ meta: [{ title: "Trade — MetaBrain Trader" }] }),
@@ -32,6 +34,15 @@ type Trade = {
   created_at: string;
 };
 
+const PRE_STEPS = new Set([
+  "PENDING", "BLIND", "STRATEGY", "VALIDATION", "LEARNING",
+  "VERDICT", "EDUCATION", "COACH", "COMPLETED", "FAILED",
+]);
+const POST_STEPS = new Set([
+  "POST_PENDING", "POST_REVIEW", "POST_MISTAKE", "POST_PERFORMANCE",
+  "POST_LEARNING", "POST_COACH", "POST_COMPLETED", "POST_FAILED",
+]);
+
 function TradeDetail() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
@@ -50,7 +61,6 @@ function TradeDetail() {
     },
   });
 
-  // Listen for trade row updates so trade_status / processing_step stay fresh
   useEffect(() => {
     const ch = supabase
       .channel(`trade-${id}-row`)
@@ -63,23 +73,28 @@ function TradeDetail() {
     return () => { supabase.removeChannel(ch); };
   }, [id, qc]);
 
-  const startAnalysis = useMutation({
-    mutationFn: async () => {
-      const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/orchestrate-pipeline`;
-      const res = await fetch(url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
-        },
-        body: JSON.stringify({ trade_id: id }),
-      });
-      if (!res.ok) throw new Error(await res.text());
-    },
-    onSuccess: () => {
-      toast.success("AI analysis started");
-      qc.invalidateQueries({ queryKey: ["trade", id] });
-    },
+  const runFn = async (fn: "orchestrate-pipeline" | "post-trade-pipeline") => {
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fn}`;
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+      },
+      body: JSON.stringify({ trade_id: id }),
+    });
+    if (!res.ok) throw new Error(await res.text());
+  };
+
+  const startPre = useMutation({
+    mutationFn: () => runFn("orchestrate-pipeline"),
+    onSuccess: () => { toast.success("AI analysis started"); qc.invalidateQueries({ queryKey: ["trade", id] }); },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
+  });
+
+  const startPost = useMutation({
+    mutationFn: () => runFn("post-trade-pipeline"),
+    onSuccess: () => { toast.success("Post-trade analysis started"); qc.invalidateQueries({ queryKey: ["trade", id] }); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
@@ -95,8 +110,7 @@ function TradeDetail() {
       const signed = await Promise.all(
         (data ?? []).map(async (s) => {
           const { data: sig } = await supabase.storage
-            .from("trade-screenshots")
-            .createSignedUrl(s.url, 60 * 60);
+            .from("trade-screenshots").createSignedUrl(s.url, 60 * 60);
           return { ...s, signedUrl: sig?.signedUrl ?? null };
         }),
       );
@@ -104,40 +118,15 @@ function TradeDetail() {
     },
   });
 
-  const reflectionsQ = useQuery({
-    queryKey: ["trade", id, "reflections"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("reflections")
-        .select("id,content,is_lesson,updated_at")
-        .eq("trade_id", id)
-        .order("updated_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const [newReflection, setNewReflection] = useState("");
-  const addReflection = useMutation({
-    mutationFn: async (content: string) => {
-      const { error } = await supabase.from("reflections").insert({ trade_id: id, content });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      setNewReflection("");
-      qc.invalidateQueries({ queryKey: ["trade", id, "reflections"] });
-      toast.success("Reflection added");
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
-  });
-
   if (tradeQ.isLoading) return <p className="text-sm text-muted-foreground">Loading…</p>;
   if (tradeQ.error || !tradeQ.data) return <p className="text-sm text-destructive">Trade not found.</p>;
 
   const t = tradeQ.data;
   const editable = t.trade_status === "DRAFT";
-  const showPipeline =
-    t.trade_status !== "DRAFT" || t.processing_step !== "PENDING";
+  const preDone = t.trade_status === "PRE_ANALYZED" || t.trade_status === "POST_ANALYSIS" || t.trade_status === "POST_ANALYZED";
+  const showPrePipeline = !editable && PRE_STEPS.has(t.processing_step);
+  const showPostPipeline = POST_STEPS.has(t.processing_step);
+  const canRunPost = preDone && !showPostPipeline;
 
   return (
     <div className="space-y-6">
@@ -154,24 +143,27 @@ function TradeDetail() {
           </div>
           <p className="mt-1 text-sm text-muted-foreground">Created {new Date(t.created_at).toLocaleString()}</p>
         </div>
-        {editable ? (
-          <Button size="sm" className="gap-2" onClick={() => startAnalysis.mutate()} disabled={startAnalysis.isPending}>
-            <Sparkles className="h-4 w-4" />
-            {startAnalysis.isPending ? "Starting…" : "Run AI analysis"}
-          </Button>
-        ) : (
-          <Button variant="outline" size="sm" disabled className="gap-2">
-            <Pencil className="h-4 w-4" /> Locked (analysis ran)
-          </Button>
-        )}
+        <div className="flex flex-wrap gap-2">
+          {editable && (
+            <Button size="sm" className="gap-2" onClick={() => startPre.mutate()} disabled={startPre.isPending}>
+              <Sparkles className="h-4 w-4" />
+              {startPre.isPending ? "Starting…" : "Run AI analysis"}
+            </Button>
+          )}
+          {canRunPost && (
+            <Button size="sm" variant="secondary" className="gap-2" onClick={() => startPost.mutate()} disabled={startPost.isPending}>
+              <Brain className="h-4 w-4" />
+              {startPost.isPending ? "Starting…" : "Run post-trade analysis"}
+            </Button>
+          )}
+        </div>
       </div>
 
-      {showPipeline && (
-        <PipelineStatus
-          tradeId={t.trade_id}
-          initialStep={t.processing_step}
-          initialError={t.processing_error}
-        />
+      {showPrePipeline && (
+        <PipelineStatus tradeId={t.trade_id} initialStep={t.processing_step} initialError={t.processing_error} />
+      )}
+      {showPostPipeline && (
+        <PostPipelineStatus tradeId={t.trade_id} initialStep={t.processing_step} initialError={t.processing_error} />
       )}
 
       <Card>
@@ -221,34 +213,9 @@ function TradeDetail() {
 
       <AiAnalysesPanel tradeId={t.trade_id} />
 
+      {preDone && <ResultForm tradeId={t.trade_id} />}
 
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">Reflections</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Textarea
-              rows={3}
-              placeholder="What did you learn? What would you do differently?"
-              value={newReflection}
-              onChange={(e) => setNewReflection(e.target.value)}
-            />
-            <div className="flex justify-end">
-              <Button size="sm" disabled={!newReflection.trim() || addReflection.isPending} onClick={() => addReflection.mutate(newReflection.trim())}>
-                {addReflection.isPending ? "Saving…" : "Add reflection"}
-              </Button>
-            </div>
-          </div>
-
-          {reflectionsQ.data && reflectionsQ.data.length > 0 && (
-            <ul className="space-y-3">
-              {reflectionsQ.data.map((r) => (
-                <ReflectionItem key={r.id} reflection={r} tradeId={id} />
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <ReflectionSections tradeId={t.trade_id} />
     </div>
   );
 }
@@ -259,63 +226,5 @@ function Field({ k, v }: { k: string; v: string | number | null }) {
       <div className="text-muted-foreground">{k}</div>
       <div className="font-medium">{v ?? "—"}</div>
     </div>
-  );
-}
-
-function ReflectionItem({
-  reflection,
-  tradeId,
-}: {
-  reflection: { id: string; content: string; updated_at: string };
-  tradeId: string;
-}) {
-  const qc = useQueryClient();
-  const [editing, setEditing] = useState(false);
-  const [draft, setDraft] = useState(reflection.content);
-  useEffect(() => { setDraft(reflection.content); }, [reflection.content]);
-
-  const save = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from("reflections").update({ content: draft }).eq("id", reflection.id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      setEditing(false);
-      qc.invalidateQueries({ queryKey: ["trade", tradeId, "reflections"] });
-    },
-    onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
-  });
-
-  const del = useMutation({
-    mutationFn: async () => {
-      const { error } = await supabase.from("reflections").delete().eq("id", reflection.id);
-      if (error) throw error;
-    },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["trade", tradeId, "reflections"] }),
-  });
-
-  return (
-    <li className="rounded-md border border-border bg-card p-3">
-      {editing ? (
-        <div className="space-y-2">
-          <Textarea rows={3} value={draft} onChange={(e) => setDraft(e.target.value)} />
-          <div className="flex justify-end gap-2">
-            <Button size="sm" variant="ghost" onClick={() => { setEditing(false); setDraft(reflection.content); }}>Cancel</Button>
-            <Button size="sm" disabled={save.isPending || !draft.trim()} onClick={() => save.mutate()}>Save</Button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          <p className="whitespace-pre-wrap text-sm">{reflection.content}</p>
-          <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{new Date(reflection.updated_at).toLocaleString()}</span>
-            <div className="flex gap-1">
-              <Button size="sm" variant="ghost" onClick={() => setEditing(true)}><Pencil className="h-3.5 w-3.5" /></Button>
-              <Button size="sm" variant="ghost" onClick={() => del.mutate()}><Trash2 className="h-3.5 w-3.5" /></Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </li>
   );
 }
