@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, BarChart3, Target, BookOpen, Plus, AlertTriangle, Trophy } from "lucide-react";
+import { TrendingUp, BarChart3, Target, BookOpen, Plus, AlertTriangle, Trophy, ShieldCheck, Handshake } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — MetaBrain Trader" }] }),
@@ -50,7 +50,10 @@ function Dashboard() {
     { label: "Closed trades", value: m?.closed_trades ?? 0, icon: BarChart3 },
     { label: "Win rate", value: m ? `${m.win_rate}%` : "—", icon: TrendingUp },
     { label: "Avg R", value: m ? m.avg_rr : "—", icon: Target },
-    { label: "Discipline", value: m ? `${m.discipline_score}` : "—", icon: BookOpen },
+    { label: "Discipline", value: m ? `${m.discipline_score}` : "—", icon: ShieldCheck },
+    { label: "Agreement", value: m ? `${m.agreement_score}` : "—", icon: Handshake },
+    { label: "Override", value: m ? `${m.override_score}` : "—", icon: AlertTriangle },
+    { label: "Trust", value: m ? `${m.trust_score}` : "—", icon: BookOpen },
   ];
 
   return (
@@ -60,12 +63,15 @@ function Dashboard() {
           <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
           <p className="mt-1 text-sm text-muted-foreground">Your trading workspace at a glance.</p>
         </div>
-        <Button asChild>
-          <Link to="/trade-creator"><Plus className="mr-2 h-4 w-4" />New trade</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline"><Link to="/journal">Journal</Link></Button>
+          <Button asChild>
+            <Link to="/trade-creator"><Plus className="mr-2 h-4 w-4" />New trade</Link>
+          </Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7">
         {stats.map((s) => (
           <Card key={s.label}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -83,12 +89,17 @@ function Dashboard() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="flex items-center gap-2 text-base">
-              <AlertTriangle className="h-4 w-4 text-destructive" /> Most common mistake
+              <AlertTriangle className="h-4 w-4 text-destructive" /> Most violated rule
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-lg font-medium">{m?.most_common_mistake ?? "No data yet"}</p>
-            <p className="text-xs text-muted-foreground mt-1">From the learning memory engine</p>
+            {m?.most_violated_rule ? (
+              <Link to="/journal" search={{ insight: m.most_violated_rule, category: "MISTAKE" }}
+                className="text-lg font-medium hover:underline">{m.most_violated_rule}</Link>
+            ) : (
+              <p className="text-lg font-medium text-muted-foreground">No data yet</p>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">Click to see every trade where this occurred.</p>
           </CardContent>
         </Card>
         <Card>
@@ -98,8 +109,13 @@ function Dashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-lg font-medium">{m?.most_profitable_behavior ?? "No data yet"}</p>
-            <p className="text-xs text-muted-foreground mt-1">Recurring strength across recent trades</p>
+            {m?.most_profitable_behavior ? (
+              <Link to="/journal" search={{ insight: m.most_profitable_behavior, category: "STRENGTH" }}
+                className="text-lg font-medium hover:underline">{m.most_profitable_behavior}</Link>
+            ) : (
+              <p className="text-lg font-medium text-muted-foreground">No data yet</p>
+            )}
+            <p className="mt-1 text-xs text-muted-foreground">Recurring strength across recent trades.</p>
           </CardContent>
         </Card>
       </div>
@@ -110,16 +126,19 @@ function Dashboard() {
           {!insightsQ.data || insightsQ.data.length === 0 ? (
             <p className="text-sm text-muted-foreground">Insights will appear after your first post-trade analysis runs.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="grid gap-3 sm:grid-cols-2">
               {insightsQ.data.map((i) => (
-                <li key={i.id} className="flex items-center justify-between gap-3 rounded-md border border-border p-3">
-                  <div className="flex items-center gap-2">
-                    <Badge variant={i.category === "MISTAKE" ? "destructive" : i.category === "STRENGTH" ? "default" : "secondary"}>
-                      {i.category}
-                    </Badge>
-                    <span className="text-sm">{i.content}</span>
-                  </div>
-                  <span className="text-xs text-muted-foreground">×{i.occurrences}</span>
+                <li key={i.id}>
+                  <Link to="/journal" search={{ insight: i.content, category: i.category as "MISTAKE" | "STRENGTH" }}
+                    className="block rounded-md border border-border p-3 transition-colors hover:bg-secondary/40">
+                    <div className="flex items-center justify-between gap-3">
+                      <Badge variant={i.category === "MISTAKE" ? "destructive" : i.category === "STRENGTH" ? "default" : "secondary"}>
+                        {i.category}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">Occurred {i.occurrences}×</span>
+                    </div>
+                    <div className="mt-2 text-sm font-medium">{i.content}</div>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -141,11 +160,8 @@ function Dashboard() {
             <ul className="divide-y divide-border">
               {tradesQ.data.map((t) => (
                 <li key={t.trade_id}>
-                  <Link
-                    to="/trade-detail/$id"
-                    params={{ id: t.trade_id }}
-                    className="flex items-center justify-between gap-4 py-3 hover:bg-secondary/40 -mx-2 px-2 rounded-md"
-                  >
+                  <Link to="/trade-detail/$id" params={{ id: t.trade_id }}
+                    className="-mx-2 flex items-center justify-between gap-4 rounded-md px-2 py-3 hover:bg-secondary/40">
                     <div className="flex items-center gap-3">
                       <span className={`inline-block h-2 w-2 rounded-full ${t.direction === "LONG" ? "bg-success" : "bg-destructive"}`} />
                       <div>
