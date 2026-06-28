@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StructuredOutput } from "@/components/structured-output";
 
 type Analysis = {
   analysis_id: string;
@@ -22,9 +23,17 @@ const STAGE_TITLES: Record<string, string> = {
   VERDICT: "Final verdict",
   EDUCATION: "Educational lesson",
   COACH: "Coaching report",
+  REVIEW: "Execution review",
+  MISTAKE: "Mistake engine",
+  PERFORMANCE: "Performance engine",
+  LEARNING_UPDATE: "Learning update",
+  COACH_REPORT: "Post-trade coach report",
 };
 
-export function AiAnalysesPanel({ tradeId }: { tradeId: string }) {
+const POST_STAGES = new Set(["REVIEW","MISTAKE","PERFORMANCE","LEARNING_UPDATE","COACH_REPORT"]);
+type Phase = "PRE" | "POST" | "ALL";
+
+export function AiAnalysesPanel({ tradeId, phase = "ALL" }: { tradeId: string; phase?: Phase }) {
   const [items, setItems] = useState<Analysis[]>([]);
 
   useEffect(() => {
@@ -32,9 +41,7 @@ export function AiAnalysesPanel({ tradeId }: { tradeId: string }) {
     const load = async () => {
       const { data } = await supabase
         .from("ai_analyses")
-        .select(
-          "analysis_id,stage,ai_output,model_provider,model_name,verdict,entry_score,created_at",
-        )
+        .select("analysis_id,stage,ai_output,model_provider,model_name,verdict,entry_score,created_at")
         .eq("trade_id", tradeId)
         .order("created_at", { ascending: true });
       if (active) setItems((data ?? []) as Analysis[]);
@@ -44,27 +51,25 @@ export function AiAnalysesPanel({ tradeId }: { tradeId: string }) {
       .channel(`trade-${tradeId}-analyses`)
       .on(
         "postgres_changes",
-        {
-          event: "INSERT",
-          schema: "public",
-          table: "ai_analyses",
-          filter: `trade_id=eq.${tradeId}`,
-        },
+        { event: "INSERT", schema: "public", table: "ai_analyses", filter: `trade_id=eq.${tradeId}` },
         () => load(),
       )
       .subscribe();
-    return () => {
-      active = false;
-      supabase.removeChannel(ch);
-    };
+    return () => { active = false; supabase.removeChannel(ch); };
   }, [tradeId]);
 
-  if (items.length === 0) return null;
+  const filtered = items.filter((a) => {
+    const stageKey = (a.ai_output?.stage as string) || a.stage;
+    if (phase === "PRE") return !POST_STAGES.has(stageKey);
+    if (phase === "POST") return POST_STAGES.has(stageKey);
+    return true;
+  });
+
+  if (filtered.length === 0) return null;
 
   return (
     <div className="space-y-4">
-      <h2 className="text-xl font-semibold">AI analysis</h2>
-      {items.map((a) => {
+      {filtered.map((a) => {
         const stageKey = (a.ai_output?.stage as string) || a.stage;
         const title = STAGE_TITLES[stageKey] ?? stageKey;
         return (
@@ -74,17 +79,8 @@ export function AiAnalysesPanel({ tradeId }: { tradeId: string }) {
                 <CardTitle className="text-base">{title}</CardTitle>
                 <div className="flex items-center gap-2">
                   {a.verdict && (
-                    <Badge
-                      variant={
-                        a.verdict === "APPROVED"
-                          ? "default"
-                          : a.verdict === "DISQUALIFIED"
-                            ? "destructive"
-                            : "secondary"
-                      }
-                    >
-                      {a.verdict}
-                      {a.entry_score != null && ` · ${a.entry_score}/100`}
+                    <Badge variant={a.verdict === "APPROVED" ? "default" : a.verdict === "DISQUALIFIED" ? "destructive" : "secondary"}>
+                      {a.verdict}{a.entry_score != null && ` · ${a.entry_score}/100`}
                     </Badge>
                   )}
                   <span className="text-xs text-muted-foreground">
@@ -93,44 +89,12 @@ export function AiAnalysesPanel({ tradeId }: { tradeId: string }) {
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {renderStructured(a.ai_output)}
+            <CardContent>
+              <StructuredOutput data={a.ai_output} />
             </CardContent>
           </Card>
         );
       })}
     </div>
   );
-}
-
-function renderStructured(obj: Record<string, unknown>) {
-  const entries = Object.entries(obj).filter(([k]) => k !== "stage");
-  return (
-    <dl className="space-y-3">
-      {entries.map(([k, v]) => (
-        <div key={k}>
-          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            {k.replace(/_/g, " ")}
-          </dt>
-          <dd className="mt-1">{renderValue(v)}</dd>
-        </div>
-      ))}
-    </dl>
-  );
-}
-
-function renderValue(v: unknown): React.ReactNode {
-  if (v == null) return <span className="text-muted-foreground">—</span>;
-  if (Array.isArray(v)) {
-    if (v.length === 0) return <span className="text-muted-foreground">—</span>;
-    return (
-      <ul className="list-disc space-y-1 pl-5">
-        {v.map((item, i) => (
-          <li key={i}>{typeof item === "string" ? item : JSON.stringify(item)}</li>
-        ))}
-      </ul>
-    );
-  }
-  if (typeof v === "object") return <pre className="overflow-x-auto rounded bg-muted p-2 text-xs">{JSON.stringify(v, null, 2)}</pre>;
-  return <span className="whitespace-pre-wrap">{String(v)}</span>;
 }
