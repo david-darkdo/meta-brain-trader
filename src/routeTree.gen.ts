@@ -16,6 +16,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedTradeCreatorRouteImport } from './routes/_authenticated/trade-creator'
 import { Route as AuthenticatedStrategyProfilesRouteImport } from './routes/_authenticated/strategy-profiles'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedJournalRouteImport } from './routes/_authenticated/journal'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedTradeDetailIdRouteImport } from './routes/_authenticated/trade-detail.$id'
 
@@ -55,6 +56,11 @@ const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedJournalRoute = AuthenticatedJournalRouteImport.update({
+  id: '/journal',
+  path: '/journal',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -72,6 +78,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/journal': typeof AuthenticatedJournalRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/strategy-profiles': typeof AuthenticatedStrategyProfilesRoute
   '/trade-creator': typeof AuthenticatedTradeCreatorRoute
@@ -82,6 +89,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/journal': typeof AuthenticatedJournalRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/strategy-profiles': typeof AuthenticatedStrategyProfilesRoute
   '/trade-creator': typeof AuthenticatedTradeCreatorRoute
@@ -94,6 +102,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/journal': typeof AuthenticatedJournalRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/strategy-profiles': typeof AuthenticatedStrategyProfilesRoute
   '/_authenticated/trade-creator': typeof AuthenticatedTradeCreatorRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/dashboard'
+    | '/journal'
     | '/profile'
     | '/strategy-profiles'
     | '/trade-creator'
@@ -116,6 +126,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/dashboard'
+    | '/journal'
     | '/profile'
     | '/strategy-profiles'
     | '/trade-creator'
@@ -127,6 +138,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/_authenticated/dashboard'
+    | '/_authenticated/journal'
     | '/_authenticated/profile'
     | '/_authenticated/strategy-profiles'
     | '/_authenticated/trade-creator'
@@ -191,6 +203,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProfileRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/journal': {
+      id: '/_authenticated/journal'
+      path: '/journal'
+      fullPath: '/journal'
+      preLoaderRoute: typeof AuthenticatedJournalRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -210,6 +229,7 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedJournalRoute: typeof AuthenticatedJournalRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedStrategyProfilesRoute: typeof AuthenticatedStrategyProfilesRoute
   AuthenticatedTradeCreatorRoute: typeof AuthenticatedTradeCreatorRoute
@@ -218,6 +238,7 @@ interface AuthenticatedRouteRouteChildren {
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedJournalRoute: AuthenticatedJournalRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedStrategyProfilesRoute: AuthenticatedStrategyProfilesRoute,
   AuthenticatedTradeCreatorRoute: AuthenticatedTradeCreatorRoute,
