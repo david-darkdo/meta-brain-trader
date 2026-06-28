@@ -30,12 +30,13 @@ async function runPipeline(tradeId: string) {
     .single();
   if (tErr || !trade) throw new Error(`Trade not found: ${tErr?.message}`);
 
-  // Strategy profile (current or active)
+  // Strategy identity (current or active)
   let profile = null;
+  const profileSelect = "name,prompt_config,trend_model,area_of_interest,confirmation_rules,risk_rules,disqualification_rules,educational_expectations,coaching_expectations";
   if (trade.current_strategy_profile_id) {
     const { data } = await admin
       .from("strategy_profiles")
-      .select("name,prompt_config")
+      .select(profileSelect)
       .eq("id", trade.current_strategy_profile_id)
       .maybeSingle();
     profile = data;
@@ -43,7 +44,7 @@ async function runPipeline(tradeId: string) {
   if (!profile) {
     const { data } = await admin
       .from("strategy_profiles")
-      .select("name,prompt_config")
+      .select(profileSelect)
       .eq("user_id", trade.user_id)
       .eq("is_active", true)
       .maybeSingle();

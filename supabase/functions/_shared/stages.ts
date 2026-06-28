@@ -26,13 +26,40 @@ const baseSchema = (extra: Record<string, unknown>, required: string[]) => ({
   properties: { ...extra, ...educationalBlock },
 });
 
+export type StrategyIdentity = {
+  name: string;
+  prompt_config: Record<string, unknown>;
+  trend_model?: Record<string, unknown>;
+  area_of_interest?: Record<string, unknown>;
+  confirmation_rules?: Record<string, unknown>;
+  risk_rules?: Record<string, unknown>;
+  disqualification_rules?: Record<string, unknown>;
+  educational_expectations?: Record<string, unknown>;
+  coaching_expectations?: Record<string, unknown>;
+};
+
 export type StageContext = {
   trade: Record<string, unknown>;
   screenshotUrls: string[];
-  strategyProfile: { name: string; prompt_config: Record<string, unknown> } | null;
+  strategyProfile: StrategyIdentity | null;
   priorAnalyses: Record<string, unknown>;
   recentTrades?: Array<Record<string, unknown>>;
 };
+
+function strategyBlock(profile: StrategyIdentity | null): string {
+  if (!profile) return "No active strategy profile.";
+  return `STRATEGY IDENTITY:\n${JSON.stringify({
+    name: profile.name,
+    trend_model: profile.trend_model ?? {},
+    area_of_interest: profile.area_of_interest ?? {},
+    confirmation_rules: profile.confirmation_rules ?? {},
+    risk_rules: profile.risk_rules ?? {},
+    disqualification_rules: profile.disqualification_rules ?? {},
+    educational_expectations: profile.educational_expectations ?? {},
+    coaching_expectations: profile.coaching_expectations ?? {},
+    legacy_prompt_config: profile.prompt_config ?? {},
+  })}`;
+}
 
 export async function runStage(stage: StageName, ctx: StageContext) {
   switch (stage) {
@@ -54,9 +81,8 @@ export async function runStage(stage: StageName, ctx: StageContext) {
       });
 
     case "STRATEGY": {
-      const profile = ctx.strategyProfile;
       return callAI({
-        system: `You evaluate the trade against the user's active strategy profile.\nStrategy profile: ${JSON.stringify(profile ?? { name: "default" })}.`,
+        system: `You evaluate the trade against the user's full active strategy identity. Apply EVERY rule block. Cite the rule name when it matches or is violated.\n${strategyBlock(ctx.strategyProfile)}`,
         user: `Trade plan: ${JSON.stringify(ctx.trade)}\nBlind analysis: ${JSON.stringify(ctx.priorAnalyses.BLIND ?? null)}`,
         images: ctx.screenshotUrls,
         schema: baseSchema(
@@ -64,8 +90,9 @@ export async function runStage(stage: StageName, ctx: StageContext) {
             alignment_score: { type: "number", minimum: 0, maximum: 100 },
             matched_rules: { type: "array", items: { type: "string" } },
             violated_rules: { type: "array", items: { type: "string" } },
+            disqualification_triggered: { type: "boolean" },
           },
-          ["alignment_score", "matched_rules", "violated_rules"],
+          ["alignment_score", "matched_rules", "violated_rules", "disqualification_triggered"],
         ),
       });
     }
