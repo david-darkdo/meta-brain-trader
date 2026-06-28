@@ -28,7 +28,9 @@ const tradeSchema = z.object({
   notes: z.string().max(4000).optional(),
 });
 
-type Screenshot = { file: File; label: string; id: string };
+type ShotType = "ENTRY" | "MANAGEMENT" | "EXIT" | "RESULT" | "ACCOUNT" | "CONTEXT";
+type Screenshot = { file: File; label: string; id: string; shot_type: ShotType };
+const SHOT_TYPES: ShotType[] = ["CONTEXT", "ENTRY", "MANAGEMENT", "EXIT", "RESULT", "ACCOUNT"];
 
 function TradeCreator() {
   const navigate = useNavigate();
@@ -60,7 +62,7 @@ function TradeCreator() {
         toast.error(`${file.name} is over 10MB`);
         continue;
       }
-      next.push({ file, label: "", id: crypto.randomUUID() });
+      next.push({ file, label: "", id: crypto.randomUUID(), shot_type: "CONTEXT" });
     }
     setShots((s) => [...s, ...next]);
   }
@@ -108,7 +110,7 @@ function TradeCreator() {
             .from("trade-screenshots")
             .upload(path, shot.file, { contentType: shot.file.type });
           if (upErr) throw upErr;
-          return { path, label: shot.label.trim() || null, is_primary: idx === 0 };
+          return { path, label: shot.label.trim() || null, is_primary: idx === 0, shot_type: shot.shot_type };
         }),
       );
 
@@ -119,6 +121,8 @@ function TradeCreator() {
             url: u.path,
             user_label: u.label,
             is_primary: u.is_primary,
+            shot_type: u.shot_type,
+            analysis_phase: "PRE" as const,
           })),
         );
         if (sErr) throw sErr;
@@ -211,13 +215,21 @@ function TradeCreator() {
                 {shots.map((s, i) => (
                   <li key={s.id} className="flex items-start gap-3 rounded-md border border-border bg-card p-3">
                     <img src={URL.createObjectURL(s.file)} alt="" className="h-16 w-16 rounded object-cover" />
-                    <div className="flex-1 space-y-1">
+                    <div className="flex-1 space-y-2">
                       <div className="truncate text-xs text-muted-foreground">{s.file.name}{i === 0 && " · primary"}</div>
-                      <Input
-                        placeholder="Label (e.g. 4H structure)"
-                        value={s.label}
-                        onChange={(e) => setShots((arr) => arr.map((x) => (x.id === s.id ? { ...x, label: e.target.value } : x)))}
-                      />
+                      <div className="grid grid-cols-2 gap-2">
+                        <Select value={s.shot_type} onValueChange={(v) => setShots((arr) => arr.map((x) => x.id === s.id ? { ...x, shot_type: v as ShotType } : x))}>
+                          <SelectTrigger className="h-8"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {SHOT_TYPES.map((t) => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                        <Input
+                          placeholder="Label (e.g. 4H structure)"
+                          value={s.label}
+                          onChange={(e) => setShots((arr) => arr.map((x) => (x.id === s.id ? { ...x, label: e.target.value } : x)))}
+                        />
+                      </div>
                     </div>
                     <Button variant="ghost" size="icon" onClick={() => setShots((arr) => arr.filter((x) => x.id !== s.id))}>
                       <Trash2 className="h-4 w-4" />

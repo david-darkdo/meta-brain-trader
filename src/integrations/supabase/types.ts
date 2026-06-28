@@ -331,27 +331,33 @@ export type Database = {
       screenshots: {
         Row: {
           ai_identified_context: Json | null
+          analysis_phase: Database["public"]["Enums"]["screenshot_phase"]
           created_at: string
           is_primary: boolean
           screenshot_id: string
+          shot_type: Database["public"]["Enums"]["screenshot_shot_type"]
           trade_id: string
           url: string
           user_label: string | null
         }
         Insert: {
           ai_identified_context?: Json | null
+          analysis_phase?: Database["public"]["Enums"]["screenshot_phase"]
           created_at?: string
           is_primary?: boolean
           screenshot_id?: string
+          shot_type?: Database["public"]["Enums"]["screenshot_shot_type"]
           trade_id: string
           url: string
           user_label?: string | null
         }
         Update: {
           ai_identified_context?: Json | null
+          analysis_phase?: Database["public"]["Enums"]["screenshot_phase"]
           created_at?: string
           is_primary?: boolean
           screenshot_id?: string
+          shot_type?: Database["public"]["Enums"]["screenshot_shot_type"]
           trade_id?: string
           url?: string
           user_label?: string | null
@@ -368,29 +374,50 @@ export type Database = {
       }
       strategy_profiles: {
         Row: {
+          area_of_interest: Json
+          coaching_expectations: Json
+          confirmation_rules: Json
           created_at: string
+          disqualification_rules: Json
+          educational_expectations: Json
           id: string
           is_active: boolean
           name: string
           prompt_config: Json
+          risk_rules: Json
+          trend_model: Json
           updated_at: string
           user_id: string
         }
         Insert: {
+          area_of_interest?: Json
+          coaching_expectations?: Json
+          confirmation_rules?: Json
           created_at?: string
+          disqualification_rules?: Json
+          educational_expectations?: Json
           id?: string
           is_active?: boolean
           name: string
           prompt_config?: Json
+          risk_rules?: Json
+          trend_model?: Json
           updated_at?: string
           user_id: string
         }
         Update: {
+          area_of_interest?: Json
+          coaching_expectations?: Json
+          confirmation_rules?: Json
           created_at?: string
+          disqualification_rules?: Json
+          educational_expectations?: Json
           id?: string
           is_active?: boolean
           name?: string
           prompt_config?: Json
+          risk_rules?: Json
+          trend_model?: Json
           updated_at?: string
           user_id?: string
         }
@@ -403,6 +430,7 @@ export type Database = {
           current_strategy_profile_id: string | null
           direction: string
           entry_price: number | null
+          executed: boolean
           notes: string | null
           pair: string
           processing_error: string | null
@@ -423,6 +451,7 @@ export type Database = {
           current_strategy_profile_id?: string | null
           direction: string
           entry_price?: number | null
+          executed?: boolean
           notes?: string | null
           pair: string
           processing_error?: string | null
@@ -443,6 +472,7 @@ export type Database = {
           current_strategy_profile_id?: string | null
           direction?: string
           entry_price?: number | null
+          executed?: boolean
           notes?: string | null
           pair?: string
           processing_error?: string | null
@@ -513,17 +543,18 @@ export type Database = {
     Views: {
       dashboard_metrics: {
         Row: {
+          agreement_score: number | null
           ai_agreement_score: number | null
           avg_rr: number | null
           closed_trades: number | null
           discipline_score: number | null
-          losses: number | null
           most_common_mistake: string | null
           most_profitable_behavior: string | null
-          total_pnl: number | null
+          most_violated_rule: string | null
+          override_score: number | null
+          trust_score: number | null
           user_id: string | null
           win_rate: number | null
-          wins: number | null
         }
         Relationships: []
       }
@@ -565,6 +596,14 @@ export type Database = {
         | "WHAT_I_LEARNED"
         | "PROMISE_TO_MYSELF"
         | "GENERAL"
+      screenshot_phase: "PRE" | "POST"
+      screenshot_shot_type:
+        | "ENTRY"
+        | "MANAGEMENT"
+        | "EXIT"
+        | "RESULT"
+        | "ACCOUNT"
+        | "CONTEXT"
       subscription_tier: "FREE" | "PRO" | "ELITE"
       trade_status:
         | "DRAFT"
@@ -737,6 +776,15 @@ export const Constants = {
         "WHAT_I_LEARNED",
         "PROMISE_TO_MYSELF",
         "GENERAL",
+      ],
+      screenshot_phase: ["PRE", "POST"],
+      screenshot_shot_type: [
+        "ENTRY",
+        "MANAGEMENT",
+        "EXIT",
+        "RESULT",
+        "ACCOUNT",
+        "CONTEXT",
       ],
       subscription_tier: ["FREE", "PRO", "ELITE"],
       trade_status: [

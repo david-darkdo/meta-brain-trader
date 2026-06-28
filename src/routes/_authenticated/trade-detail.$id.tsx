@@ -1,16 +1,22 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Sparkles, Brain } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import { ArrowLeft, Sparkles, Brain, Lock } from "lucide-react";
 import { toast } from "sonner";
 import { PipelineStatus } from "@/components/pipeline-status";
 import { PostPipelineStatus } from "@/components/post-pipeline-status";
 import { AiAnalysesPanel } from "@/components/ai-analyses-panel";
 import { ResultForm } from "@/components/result-form";
 import { ReflectionSections } from "@/components/reflection-sections";
+import { PostScreenshotUploader } from "@/components/post-screenshot-uploader";
+import { AgreementBadges } from "@/components/agreement-badges";
 
 export const Route = createFileRoute("/_authenticated/trade-detail/$id")({
   head: () => ({ meta: [{ title: "Trade — MetaBrain Trader" }] }),
@@ -19,6 +25,7 @@ export const Route = createFileRoute("/_authenticated/trade-detail/$id")({
 
 type Trade = {
   trade_id: string;
+  user_id: string;
   pair: string;
   direction: string;
   trade_status: string;
@@ -31,28 +38,24 @@ type Trade = {
   risk_pct: number | null;
   session: string | null;
   notes: string | null;
+  executed: boolean;
   created_at: string;
 };
 
-const PRE_STEPS = new Set([
-  "PENDING", "BLIND", "STRATEGY", "VALIDATION", "LEARNING",
-  "VERDICT", "EDUCATION", "COACH", "COMPLETED", "FAILED",
-]);
-const POST_STEPS = new Set([
-  "POST_PENDING", "POST_REVIEW", "POST_MISTAKE", "POST_PERFORMANCE",
-  "POST_LEARNING", "POST_COACH", "POST_COMPLETED", "POST_FAILED",
-]);
+const PRE_STEPS = new Set(["PENDING","BLIND","STRATEGY","VALIDATION","LEARNING","VERDICT","EDUCATION","COACH","COMPLETED","FAILED"]);
+const POST_STEPS = new Set(["POST_PENDING","POST_REVIEW","POST_MISTAKE","POST_PERFORMANCE","POST_LEARNING","POST_COACH","POST_COMPLETED","POST_FAILED"]);
 
 function TradeDetail() {
   const { id } = Route.useParams();
   const qc = useQueryClient();
+  const [tab, setTab] = useState<"pre" | "post" | "reflection">("pre");
 
   const tradeQ = useQuery({
     queryKey: ["trade", id],
     queryFn: async (): Promise<Trade> => {
       const { data, error } = await supabase
         .from("trades")
-        .select("trade_id,pair,direction,trade_status,processing_step,processing_error,entry_price,stop_loss,take_profit,account_size,risk_pct,session,notes,created_at")
+        .select("trade_id,user_id,pair,direction,trade_status,processing_step,processing_error,entry_price,stop_loss,take_profit,account_size,risk_pct,session,notes,executed,created_at")
         .eq("trade_id", id)
         .single();
       if (error) throw error;
@@ -61,14 +64,31 @@ function TradeDetail() {
     },
   });
 
+  const resultQ = useQuery({
+    queryKey: ["trade", id, "result-exists"],
+    queryFn: async () => {
+      const { data } = await supabase.from("results").select("id,outcome").eq("trade_id", id).maybeSingle();
+      return data;
+    },
+  });
+
+  const verdictQ = useQuery({
+    queryKey: ["trade", id, "verdict"],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from("ai_analyses").select("ai_output,verdict")
+        .eq("trade_id", id).eq("stage", "VERDICT")
+        .order("created_at", { ascending: false }).limit(1).maybeSingle();
+      return data;
+    },
+  });
+
   useEffect(() => {
     const ch = supabase
       .channel(`trade-${id}-row`)
-      .on(
-        "postgres_changes",
+      .on("postgres_changes",
         { event: "UPDATE", schema: "public", table: "trades", filter: `trade_id=eq.${id}` },
-        () => qc.invalidateQueries({ queryKey: ["trade", id] }),
-      )
+        () => qc.invalidateQueries({ queryKey: ["trade", id] }))
       .subscribe();
     return () => { supabase.removeChannel(ch); };
   }, [id, qc]);
@@ -77,10 +97,7 @@ function TradeDetail() {
     const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fn}`;
     const res = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
-      },
+      headers: { "Content-Type": "application/json", apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string },
       body: JSON.stringify({ trade_id: id }),
     });
     if (!res.ok) throw new Error(await res.text());
@@ -94,23 +111,30 @@ function TradeDetail() {
 
   const startPost = useMutation({
     mutationFn: () => runFn("post-trade-pipeline"),
-    onSuccess: () => { toast.success("Post-trade analysis started"); qc.invalidateQueries({ queryKey: ["trade", id] }); },
+    onSuccess: () => { toast.success("Post-trade analysis started"); qc.invalidateQueries({ queryKey: ["trade", id] }); setTab("post"); },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
+  const toggleExecuted = useMutation({
+    mutationFn: async (next: boolean) => {
+      const { error } = await supabase.from("trades").update({ executed: next }).eq("trade_id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["trade", id] }),
+  });
+
   const shotsQ = useQuery({
-    queryKey: ["trade", id, "screenshots"],
+    queryKey: ["trade", id, "pre-screenshots"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("screenshots")
-        .select("screenshot_id,url,user_label,is_primary")
-        .eq("trade_id", id)
+        .select("screenshot_id,url,user_label,is_primary,shot_type")
+        .eq("trade_id", id).eq("analysis_phase", "PRE")
         .order("is_primary", { ascending: false });
       if (error) throw error;
       const signed = await Promise.all(
         (data ?? []).map(async (s) => {
-          const { data: sig } = await supabase.storage
-            .from("trade-screenshots").createSignedUrl(s.url, 60 * 60);
+          const { data: sig } = await supabase.storage.from("trade-screenshots").createSignedUrl(s.url, 60 * 60);
           return { ...s, signedUrl: sig?.signedUrl ?? null };
         }),
       );
@@ -123,10 +147,14 @@ function TradeDetail() {
 
   const t = tradeQ.data;
   const editable = t.trade_status === "DRAFT";
-  const preDone = t.trade_status === "PRE_ANALYZED" || t.trade_status === "POST_ANALYSIS" || t.trade_status === "POST_ANALYZED";
+  const preDone = ["PRE_ANALYZED","POST_ANALYSIS","POST_ANALYZED"].includes(t.trade_status);
   const showPrePipeline = !editable && PRE_STEPS.has(t.processing_step);
   const showPostPipeline = POST_STEPS.has(t.processing_step);
   const canRunPost = preDone && !showPostPipeline;
+  const postCompleted = t.processing_step === "POST_COMPLETED" || t.trade_status === "POST_ANALYZED";
+  const postTabAvailable = preDone || !!resultQ.data;
+  const reflectionUnlocked = postCompleted;
+  const verdict = verdictQ.data?.verdict ?? (verdictQ.data?.ai_output as { verdict?: string } | null)?.verdict ?? null;
 
   return (
     <div className="space-y-6">
@@ -136,86 +164,107 @@ function TradeDetail() {
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-3xl font-bold tracking-tight">{t.pair}</h1>
-            <span className={`rounded-md px-2 py-0.5 text-xs font-medium ${t.direction === "LONG" ? "bg-success/20 text-success" : "bg-destructive/20 text-destructive"}`}>{t.direction}</span>
-            <span className="rounded-md border border-border bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{t.trade_status}</span>
+            <Badge variant={t.direction === "LONG" ? "default" : "destructive"}>{t.direction}</Badge>
+            <Badge variant="secondary">{t.trade_status}</Badge>
+            <AgreementBadges verdict={verdict} executed={t.executed} hasResult={!!resultQ.data} />
           </div>
           <p className="mt-1 text-sm text-muted-foreground">Created {new Date(t.created_at).toLocaleString()}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
+            <Label htmlFor="executed" className="text-xs">Executed</Label>
+            <Switch id="executed" checked={t.executed} onCheckedChange={(v) => toggleExecuted.mutate(v)} />
+          </div>
           {editable && (
             <Button size="sm" className="gap-2" onClick={() => startPre.mutate()} disabled={startPre.isPending}>
-              <Sparkles className="h-4 w-4" />
-              {startPre.isPending ? "Starting…" : "Run AI analysis"}
+              <Sparkles className="h-4 w-4" />{startPre.isPending ? "Starting…" : "Run AI analysis"}
             </Button>
           )}
           {canRunPost && (
             <Button size="sm" variant="secondary" className="gap-2" onClick={() => startPost.mutate()} disabled={startPost.isPending}>
-              <Brain className="h-4 w-4" />
-              {startPost.isPending ? "Starting…" : "Run post-trade analysis"}
+              <Brain className="h-4 w-4" />{startPost.isPending ? "Starting…" : "Run post-trade analysis"}
             </Button>
           )}
         </div>
       </div>
 
-      {showPrePipeline && (
-        <PipelineStatus tradeId={t.trade_id} initialStep={t.processing_step} initialError={t.processing_error} />
-      )}
-      {showPostPipeline && (
-        <PostPipelineStatus tradeId={t.trade_id} initialStep={t.processing_step} initialError={t.processing_error} />
-      )}
+      {showPrePipeline && <PipelineStatus tradeId={t.trade_id} initialStep={t.processing_step} initialError={t.processing_error} />}
+      {showPostPipeline && <PostPipelineStatus tradeId={t.trade_id} initialStep={t.processing_step} initialError={t.processing_error} />}
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Trade plan</CardTitle></CardHeader>
-        <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
-          <Field k="Entry" v={t.entry_price} />
-          <Field k="Stop loss" v={t.stop_loss} />
-          <Field k="Take profit" v={t.take_profit} />
-          <Field k="Account size" v={t.account_size} />
-          <Field k="Risk %" v={t.risk_pct} />
-          <Field k="Session" v={t.session} />
-          {t.notes && (
-            <div className="col-span-full">
-              <div className="text-muted-foreground">Notes</div>
-              <p className="mt-1 whitespace-pre-wrap">{t.notes}</p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)} className="w-full">
+        <TabsList className="w-full justify-start">
+          <TabsTrigger value="pre">Pre-trade</TabsTrigger>
+          <TabsTrigger value="post" disabled={!postTabAvailable}>Post-trade audit</TabsTrigger>
+          <TabsTrigger value="reflection" disabled={!reflectionUnlocked} className="gap-1">
+            {!reflectionUnlocked && <Lock className="h-3 w-3" />}Reflection
+          </TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader><CardTitle className="text-base">Screenshots</CardTitle></CardHeader>
-        <CardContent>
-          {shotsQ.isLoading ? (
-            <p className="text-sm text-muted-foreground">Loading…</p>
-          ) : !shotsQ.data || shotsQ.data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No screenshots attached.</p>
+        <TabsContent value="pre" className="space-y-6 pt-4">
+          <Card>
+            <CardHeader><CardTitle className="text-base">Trade plan</CardTitle></CardHeader>
+            <CardContent className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
+              <Field k="Entry" v={t.entry_price} />
+              <Field k="Stop loss" v={t.stop_loss} />
+              <Field k="Take profit" v={t.take_profit} />
+              <Field k="Account size" v={t.account_size} />
+              <Field k="Risk %" v={t.risk_pct} />
+              <Field k="Session" v={t.session} />
+              {t.notes && (
+                <div className="col-span-full">
+                  <div className="text-muted-foreground">Notes</div>
+                  <p className="mt-1 whitespace-pre-wrap">{t.notes}</p>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader><CardTitle className="text-base">Pre-trade screenshots</CardTitle></CardHeader>
+            <CardContent>
+              {shotsQ.isLoading ? (
+                <p className="text-sm text-muted-foreground">Loading…</p>
+              ) : !shotsQ.data || shotsQ.data.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No screenshots attached.</p>
+              ) : (
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {shotsQ.data.map((s) => (
+                    <figure key={s.screenshot_id} className="space-y-1">
+                      {s.signedUrl ? (
+                        <img src={s.signedUrl} alt={s.user_label ?? ""} className="w-full rounded-md border border-border" />
+                      ) : (<div className="aspect-video rounded-md bg-muted" />)}
+                      <figcaption className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>{s.user_label || s.shot_type}</span>
+                        {s.is_primary && <span className="text-primary">Primary</span>}
+                      </figcaption>
+                    </figure>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <AiAnalysesPanel tradeId={t.trade_id} phase="PRE" />
+        </TabsContent>
+
+        <TabsContent value="post" className="space-y-6 pt-4">
+          <ResultForm tradeId={t.trade_id} />
+          <PostScreenshotUploader tradeId={t.trade_id} userId={t.user_id} />
+          <AiAnalysesPanel tradeId={t.trade_id} phase="POST" />
+        </TabsContent>
+
+        <TabsContent value="reflection" className="space-y-6 pt-4">
+          {reflectionUnlocked ? (
+            <ReflectionSections tradeId={t.trade_id} />
           ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {shotsQ.data.map((s) => (
-                <figure key={s.screenshot_id} className="space-y-1">
-                  {s.signedUrl ? (
-                    <img src={s.signedUrl} alt={s.user_label ?? "trade screenshot"} className="w-full rounded-md border border-border" />
-                  ) : (
-                    <div className="aspect-video rounded-md bg-muted" />
-                  )}
-                  <figcaption className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{s.user_label || "Unlabeled"}</span>
-                    {s.is_primary && <span className="text-primary">Primary</span>}
-                  </figcaption>
-                </figure>
-              ))}
-            </div>
+            <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
+              Reflection unlocks after the post-trade AI audit completes.
+            </CardContent></Card>
           )}
-        </CardContent>
-      </Card>
-
-      <AiAnalysesPanel tradeId={t.trade_id} />
-
-      {preDone && <ResultForm tradeId={t.trade_id} />}
-
-      <ReflectionSections tradeId={t.trade_id} />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
