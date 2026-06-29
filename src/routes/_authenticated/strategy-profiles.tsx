@@ -193,7 +193,7 @@ function StrategyOS() {
           name: (DEFAULTS.system_profile.strategy_name as string) ?? "MetaBrain OS",
           is_active: true,
           prompt_config: {},
-          ...DEFAULTS,
+          ...(DEFAULTS as unknown as Record<string, never>),
         })
         .select("*")
         .single();
