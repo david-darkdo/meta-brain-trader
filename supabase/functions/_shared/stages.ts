@@ -27,8 +27,8 @@ const baseSchema = (extra: Record<string, unknown>, required: string[]) => ({
 });
 
 export type StrategyIdentity = {
-  name: string;
-  prompt_config: Record<string, unknown>;
+  name?: string | null;
+  prompt_config?: Record<string, unknown>;
   trend_model?: Record<string, unknown>;
   area_of_interest?: Record<string, unknown>;
   confirmation_rules?: Record<string, unknown>;
@@ -36,6 +36,16 @@ export type StrategyIdentity = {
   disqualification_rules?: Record<string, unknown>;
   educational_expectations?: Record<string, unknown>;
   coaching_expectations?: Record<string, unknown>;
+  system_profile?: Record<string, unknown>;
+  core_strategy?: Record<string, unknown>;
+  entry_confirmations?: Record<string, unknown>;
+  risk_engine?: Record<string, unknown>;
+  filter_engine?: Record<string, unknown>;
+  psychology_engine?: Record<string, unknown>;
+  learning_engine?: Record<string, unknown>;
+  education_engine?: Record<string, unknown>;
+  community_engine?: Record<string, unknown>;
+  investor_engine?: Record<string, unknown>;
 };
 
 export type StageContext = {
@@ -48,16 +58,25 @@ export type StageContext = {
 
 function strategyBlock(profile: StrategyIdentity | null): string {
   if (!profile) return "No active strategy profile.";
-  return `STRATEGY IDENTITY:\n${JSON.stringify({
-    name: profile.name,
-    trend_model: profile.trend_model ?? {},
-    area_of_interest: profile.area_of_interest ?? {},
-    confirmation_rules: profile.confirmation_rules ?? {},
-    risk_rules: profile.risk_rules ?? {},
-    disqualification_rules: profile.disqualification_rules ?? {},
-    educational_expectations: profile.educational_expectations ?? {},
-    coaching_expectations: profile.coaching_expectations ?? {},
-    legacy_prompt_config: profile.prompt_config ?? {},
+  const sp = (profile.system_profile ?? {}) as Record<string, unknown>;
+  return `STRATEGY OPERATING SYSTEM:\n${JSON.stringify({
+    name: sp.strategy_name ?? profile.name ?? "Untitled",
+    system_profile: profile.system_profile ?? {},
+    core_strategy: profile.core_strategy ?? {},
+    entry_confirmations: profile.entry_confirmations ?? {},
+    risk_engine: profile.risk_engine ?? {},
+    filter_engine: profile.filter_engine ?? {},
+    psychology_engine: profile.psychology_engine ?? {},
+    learning_engine: profile.learning_engine ?? {},
+    education_engine: profile.education_engine ?? {},
+    legacy: {
+      trend_model: profile.trend_model ?? {},
+      area_of_interest: profile.area_of_interest ?? {},
+      confirmation_rules: profile.confirmation_rules ?? {},
+      risk_rules: profile.risk_rules ?? {},
+      disqualification_rules: profile.disqualification_rules ?? {},
+      prompt_config: profile.prompt_config ?? {},
+    },
   })}`;
 }
 
