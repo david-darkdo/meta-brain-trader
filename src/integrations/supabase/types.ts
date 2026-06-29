@@ -376,15 +376,25 @@ export type Database = {
         Row: {
           area_of_interest: Json
           coaching_expectations: Json
+          community_engine: Json
           confirmation_rules: Json
+          core_strategy: Json
           created_at: string
           disqualification_rules: Json
+          education_engine: Json
           educational_expectations: Json
+          entry_confirmations: Json
+          filter_engine: Json
           id: string
+          investor_engine: Json
           is_active: boolean
-          name: string
+          learning_engine: Json
+          name: string | null
           prompt_config: Json
+          psychology_engine: Json
+          risk_engine: Json
           risk_rules: Json
+          system_profile: Json
           trend_model: Json
           updated_at: string
           user_id: string
@@ -392,15 +402,25 @@ export type Database = {
         Insert: {
           area_of_interest?: Json
           coaching_expectations?: Json
+          community_engine?: Json
           confirmation_rules?: Json
+          core_strategy?: Json
           created_at?: string
           disqualification_rules?: Json
+          education_engine?: Json
           educational_expectations?: Json
+          entry_confirmations?: Json
+          filter_engine?: Json
           id?: string
+          investor_engine?: Json
           is_active?: boolean
-          name: string
+          learning_engine?: Json
+          name?: string | null
           prompt_config?: Json
+          psychology_engine?: Json
+          risk_engine?: Json
           risk_rules?: Json
+          system_profile?: Json
           trend_model?: Json
           updated_at?: string
           user_id: string
@@ -408,15 +428,25 @@ export type Database = {
         Update: {
           area_of_interest?: Json
           coaching_expectations?: Json
+          community_engine?: Json
           confirmation_rules?: Json
+          core_strategy?: Json
           created_at?: string
           disqualification_rules?: Json
+          education_engine?: Json
           educational_expectations?: Json
+          entry_confirmations?: Json
+          filter_engine?: Json
           id?: string
+          investor_engine?: Json
           is_active?: boolean
-          name?: string
+          learning_engine?: Json
+          name?: string | null
           prompt_config?: Json
+          psychology_engine?: Json
+          risk_engine?: Json
           risk_rules?: Json
+          system_profile?: Json
           trend_model?: Json
           updated_at?: string
           user_id?: string
