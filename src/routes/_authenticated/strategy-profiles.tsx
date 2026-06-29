@@ -271,7 +271,7 @@ function SectionCard({
     mutationFn: async (next: Record<string, unknown>) => {
       const { error } = await supabase
         .from("strategy_profiles")
-        .update({ [section]: next })
+        .update({ [section]: next } as never)
         .eq("id", profileId);
       if (error) throw error;
       return next;
