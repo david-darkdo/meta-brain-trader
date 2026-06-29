@@ -32,7 +32,7 @@ async function runPipeline(tradeId: string) {
 
   // Strategy identity (current or active)
   let profile = null;
-  const profileSelect = "name,prompt_config,trend_model,area_of_interest,confirmation_rules,risk_rules,disqualification_rules,educational_expectations,coaching_expectations";
+  const profileSelect = "name,prompt_config,trend_model,area_of_interest,confirmation_rules,risk_rules,disqualification_rules,educational_expectations,coaching_expectations,system_profile,core_strategy,entry_confirmations,risk_engine,filter_engine,psychology_engine,learning_engine,education_engine,community_engine,investor_engine";
   if (trade.current_strategy_profile_id) {
     const { data } = await admin
       .from("strategy_profiles")
