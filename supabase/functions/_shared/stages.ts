@@ -29,60 +29,53 @@ const baseSchema = (extra: Record<string, unknown>, required: string[]) => ({
 export type StrategyIdentity = {
   name?: string | null;
   prompt_config?: Record<string, unknown>;
-  trend_model?: Record<string, unknown>;
-  area_of_interest?: Record<string, unknown>;
-  confirmation_rules?: Record<string, unknown>;
-  risk_rules?: Record<string, unknown>;
-  disqualification_rules?: Record<string, unknown>;
-  educational_expectations?: Record<string, unknown>;
-  coaching_expectations?: Record<string, unknown>;
-  system_profile?: Record<string, unknown>;
-  core_strategy?: Record<string, unknown>;
-  entry_confirmations?: Record<string, unknown>;
-  risk_engine?: Record<string, unknown>;
-  filter_engine?: Record<string, unknown>;
-  psychology_engine?: Record<string, unknown>;
-  learning_engine?: Record<string, unknown>;
-  education_engine?: Record<string, unknown>;
-  community_engine?: Record<string, unknown>;
-  investor_engine?: Record<string, unknown>;
+};
+
+export type PromptOS = {
+  system_identity_prompt?: string;
+  core_strategy_prompt?: string;
+  entry_confirmation_prompt?: string;
+  risk_prompt?: string;
+  filter_prompt?: string;
+  psychology_prompt?: string;
+  learning_prompt?: string;
+  education_prompt?: string;
+  community_prompt?: string;
+  investor_prompt?: string;
 };
 
 export type StageContext = {
   trade: Record<string, unknown>;
   screenshotUrls: string[];
   strategyProfile: StrategyIdentity | null;
+  promptOS: PromptOS | null;
   priorAnalyses: Record<string, unknown>;
   recentTrades?: Array<Record<string, unknown>>;
 };
 
-function strategyBlock(profile: StrategyIdentity | null): string {
-  if (!profile) return "No active strategy profile.";
-  const sp = (profile.system_profile ?? {}) as Record<string, unknown>;
-  return `STRATEGY OPERATING SYSTEM:\n${JSON.stringify({
-    name: sp.strategy_name ?? profile.name ?? "Untitled",
-    system_profile: profile.system_profile ?? {},
-    core_strategy: profile.core_strategy ?? {},
-    entry_confirmations: profile.entry_confirmations ?? {},
-    risk_engine: profile.risk_engine ?? {},
-    filter_engine: profile.filter_engine ?? {},
-    psychology_engine: profile.psychology_engine ?? {},
-    learning_engine: profile.learning_engine ?? {},
-    education_engine: profile.education_engine ?? {},
-    legacy: {
-      trend_model: profile.trend_model ?? {},
-      area_of_interest: profile.area_of_interest ?? {},
-      confirmation_rules: profile.confirmation_rules ?? {},
-      risk_rules: profile.risk_rules ?? {},
-      disqualification_rules: profile.disqualification_rules ?? {},
-      prompt_config: profile.prompt_config ?? {},
-    },
-  })}`;
+function block(title: string, body?: string) {
+  const b = (body ?? "").trim();
+  if (!b) return "";
+  return `\n\n=== ${title} ===\n${b}\n=== END ${title} ===`;
+}
+
+function sys(base: string, os: PromptOS | null, engines: (keyof PromptOS)[]) {
+  const identity = os?.system_identity_prompt?.trim();
+  const parts = [
+    identity ? block("METABRAIN SYSTEM IDENTITY", identity) : "",
+    ...engines.map((k) => block(k.replace(/_/g, " ").toUpperCase(), os?.[k])),
+  ]
+    .filter(Boolean)
+    .join("");
+  return `${base}${parts}`;
 }
 
 export async function runStage(stage: StageName, ctx: StageContext) {
+  const os = ctx.promptOS;
+
   switch (stage) {
     case "BLIND":
+      // Vision-only, deliberately no strategy context injected.
       return callAI({
         system:
           "You are a vision-only price action analyst. Analyze ONLY the chart screenshots provided. Do NOT use any text context, user notes, or trade plan. Report what you see structurally.",
@@ -99,9 +92,13 @@ export async function runStage(stage: StageName, ctx: StageContext) {
         ),
       });
 
-    case "STRATEGY": {
+    case "STRATEGY":
       return callAI({
-        system: `You evaluate the trade against the user's full active strategy identity. Apply EVERY rule block. Cite the rule name when it matches or is violated.\n${strategyBlock(ctx.strategyProfile)}`,
+        system: sys(
+          "You evaluate the trade against the trader's Strategy OS. Apply EVERY rule verbatim from the engines below. Cite exact rule names when matched or violated.",
+          os,
+          ["core_strategy_prompt", "entry_confirmation_prompt", "filter_prompt"],
+        ),
         user: `Trade plan: ${JSON.stringify(ctx.trade)}\nBlind analysis: ${JSON.stringify(ctx.priorAnalyses.BLIND ?? null)}`,
         images: ctx.screenshotUrls,
         schema: baseSchema(
@@ -114,12 +111,14 @@ export async function runStage(stage: StageName, ctx: StageContext) {
           ["alignment_score", "matched_rules", "violated_rules", "disqualification_triggered"],
         ),
       });
-    }
 
     case "VALIDATION":
       return callAI({
-        system:
-          "You validate trade setup quality (risk/reward, invalidation clarity, entry timing).",
+        system: sys(
+          "You validate trade setup quality (risk/reward, invalidation clarity, entry timing) strictly against the Risk Engine below.",
+          os,
+          ["risk_prompt", "filter_prompt"],
+        ),
         user: `Trade: ${JSON.stringify(ctx.trade)}\nBlind: ${JSON.stringify(ctx.priorAnalyses.BLIND ?? null)}\nStrategy: ${JSON.stringify(ctx.priorAnalyses.STRATEGY ?? null)}`,
         schema: baseSchema(
           {
@@ -134,8 +133,11 @@ export async function runStage(stage: StageName, ctx: StageContext) {
 
     case "LEARNING":
       return callAI({
-        system:
-          "You analyze the trader's recent history to surface relevant patterns from prior trades.",
+        system: sys(
+          "You analyze the trader's recent history to surface relevant patterns from prior trades, following the Learning Engine directives.",
+          os,
+          ["learning_prompt"],
+        ),
         user: `Current trade: ${JSON.stringify(ctx.trade)}\nLast 24 trades summary: ${JSON.stringify(ctx.recentTrades ?? [])}\nBlind: ${JSON.stringify(ctx.priorAnalyses.BLIND ?? null)}`,
         schema: baseSchema(
           {
@@ -144,26 +146,21 @@ export async function runStage(stage: StageName, ctx: StageContext) {
             similar_setups_count: { type: "number" },
             historical_edge: { type: "string" },
           },
-          [
-            "recurring_strengths",
-            "recurring_mistakes",
-            "similar_setups_count",
-            "historical_edge",
-          ],
+          ["recurring_strengths", "recurring_mistakes", "similar_setups_count", "historical_edge"],
         ),
       });
 
     case "VERDICT":
       return callAI({
-        system:
-          "You issue the final verdict integrating all prior stages. Be decisive.",
+        system: sys(
+          "You issue the final verdict integrating all prior stages. Be decisive. Enforce the System Identity and Risk Engine authority.",
+          os,
+          ["risk_prompt", "filter_prompt"],
+        ),
         user: `All prior stages: ${JSON.stringify(ctx.priorAnalyses)}`,
         schema: baseSchema(
           {
-            verdict: {
-              type: "string",
-              enum: ["APPROVED", "DISQUALIFIED", "NEUTRAL"],
-            },
+            verdict: { type: "string", enum: ["APPROVED", "DISQUALIFIED", "NEUTRAL"] },
             entry_score: { type: "number", minimum: 0, maximum: 100 },
             primary_reason: { type: "string" },
             risk_factors: { type: "array", items: { type: "string" } },
@@ -174,8 +171,11 @@ export async function runStage(stage: StageName, ctx: StageContext) {
 
     case "EDUCATION":
       return callAI({
-        system:
-          "You generate an educational lesson around this setup, accessible to intermediate traders.",
+        system: sys(
+          "You generate an educational lesson around this setup, following the Education Engine directives.",
+          os,
+          ["education_prompt"],
+        ),
         user: `Verdict: ${JSON.stringify(ctx.priorAnalyses.VERDICT ?? null)}\nBlind: ${JSON.stringify(ctx.priorAnalyses.BLIND ?? null)}`,
         schema: baseSchema(
           {
@@ -190,8 +190,11 @@ export async function runStage(stage: StageName, ctx: StageContext) {
 
     case "COACH":
       return callAI({
-        system:
-          "You are an empathetic trading coach. Provide actionable, personal coaching notes.",
+        system: sys(
+          "You are the MetaBrain coach. Provide actionable, personal coaching notes guided by the Psychology Engine.",
+          os,
+          ["psychology_prompt", "education_prompt"],
+        ),
         user: `All analyses: ${JSON.stringify(ctx.priorAnalyses)}`,
         schema: baseSchema(
           {
