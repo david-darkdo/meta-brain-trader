@@ -30,13 +30,12 @@ async function runPipeline(tradeId: string) {
     .single();
   if (tErr || !trade) throw new Error(`Trade not found: ${tErr?.message}`);
 
-  // Strategy identity (current or active)
-  let profile = null;
-  const profileSelect = "name,prompt_config,trend_model,area_of_interest,confirmation_rules,risk_rules,disqualification_rules,educational_expectations,coaching_expectations,system_profile,core_strategy,entry_confirmations,risk_engine,filter_engine,psychology_engine,learning_engine,education_engine,community_engine,investor_engine";
+  // Legacy strategy_profiles row for name/prompt_config only
+  let profile: { name?: string; prompt_config?: Record<string, unknown> } | null = null;
   if (trade.current_strategy_profile_id) {
     const { data } = await admin
       .from("strategy_profiles")
-      .select(profileSelect)
+      .select("name,prompt_config")
       .eq("id", trade.current_strategy_profile_id)
       .maybeSingle();
     profile = data;
@@ -44,12 +43,21 @@ async function runPipeline(tradeId: string) {
   if (!profile) {
     const { data } = await admin
       .from("strategy_profiles")
-      .select(profileSelect)
+      .select("name,prompt_config")
       .eq("user_id", trade.user_id)
       .eq("is_active", true)
       .maybeSingle();
     profile = data;
   }
+
+  // Strategy OS prompts — the editable AI operating system
+  const { data: promptOS } = await admin
+    .from("strategy_os")
+    .select(
+      "system_identity_prompt,core_strategy_prompt,entry_confirmation_prompt,risk_prompt,filter_prompt,psychology_prompt,learning_prompt,education_prompt,community_prompt,investor_prompt",
+    )
+    .eq("user_id", trade.user_id)
+    .maybeSingle();
 
   // Screenshots
   const { data: shots } = await admin
@@ -74,6 +82,7 @@ async function runPipeline(tradeId: string) {
     trade,
     screenshotUrls: signed,
     strategyProfile: profile,
+    promptOS: promptOS ?? null,
     priorAnalyses,
     recentTrades: recent ?? [],
   };

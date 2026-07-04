@@ -133,6 +133,14 @@ async function runPipeline(tradeId: string) {
     .order("created_at", { ascending: false })
     .limit(24);
 
+  const { data: promptOS } = await admin
+    .from("strategy_os")
+    .select(
+      "system_identity_prompt,core_strategy_prompt,entry_confirmation_prompt,risk_prompt,filter_prompt,psychology_prompt,learning_prompt,education_prompt,community_prompt,investor_prompt",
+    )
+    .eq("user_id", trade.user_id)
+    .maybeSingle();
+
   const ctx: PostStageContext = {
     trade,
     result: result ?? null,
@@ -141,6 +149,7 @@ async function runPipeline(tradeId: string) {
     priorPost,
     recentTrades: recent ?? [],
     screenshotUrls: signed,
+    promptOS: promptOS ?? null,
   };
 
   const stepMap: Record<PostStageName, string> = {

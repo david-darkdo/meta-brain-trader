@@ -2,6 +2,7 @@
 // abstraction; does NOT alter pre-trade stages.
 
 import { callAI, educationalBlock } from "./ai.ts";
+import type { PromptOS } from "./stages.ts";
 
 export type PostStageName =
   | "REVIEW"
@@ -29,18 +30,40 @@ export type PostStageContext = {
   trade: Record<string, unknown>;
   result: Record<string, unknown> | null;
   reflections: Array<Record<string, unknown>>;
-  priorPre: Record<string, unknown>; // pre-trade analyses keyed by stage
+  priorPre: Record<string, unknown>;
   priorPost: Record<string, unknown>;
   recentTrades: Array<Record<string, unknown>>;
   screenshotUrls: string[];
+  promptOS: PromptOS | null;
 };
 
+function block(title: string, body?: string) {
+  const b = (body ?? "").trim();
+  if (!b) return "";
+  return `\n\n=== ${title} ===\n${b}\n=== END ${title} ===`;
+}
+
+function sys(base: string, os: PromptOS | null, engines: (keyof PromptOS)[]) {
+  const identity = os?.system_identity_prompt?.trim();
+  const parts = [
+    identity ? block("METABRAIN SYSTEM IDENTITY", identity) : "",
+    ...engines.map((k) => block(k.replace(/_/g, " ").toUpperCase(), os?.[k])),
+  ]
+    .filter(Boolean)
+    .join("");
+  return `${base}${parts}`;
+}
+
 export async function runPostStage(stage: PostStageName, ctx: PostStageContext) {
+  const os = ctx.promptOS;
   switch (stage) {
     case "REVIEW":
       return callAI({
-        system:
+        system: sys(
           "You review what actually happened in the trade vs. the original plan and pre-trade analysis. Be objective.",
+          os,
+          ["core_strategy_prompt", "entry_confirmation_prompt"],
+        ),
         user: `Trade plan: ${JSON.stringify(ctx.trade)}\nResult: ${JSON.stringify(ctx.result)}\nPre-trade analyses: ${JSON.stringify(ctx.priorPre)}\nReflections: ${JSON.stringify(ctx.reflections)}`,
         images: ctx.screenshotUrls,
         schema: baseSchema(
@@ -56,8 +79,11 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
 
     case "MISTAKE":
       return callAI({
-        system:
-          "You identify mistakes and process errors in this trade. Tag each with a short canonical label.",
+        system: sys(
+          "You identify mistakes and process errors in this trade. Tag each with a short canonical label from the Psychology + Filter engines.",
+          os,
+          ["psychology_prompt", "filter_prompt", "risk_prompt"],
+        ),
         user: `Review: ${JSON.stringify(ctx.priorPost.REVIEW ?? null)}\nTrade: ${JSON.stringify(ctx.trade)}\nResult: ${JSON.stringify(ctx.result)}\nReflections: ${JSON.stringify(ctx.reflections)}`,
         schema: baseSchema(
           {
@@ -82,8 +108,11 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
 
     case "PERFORMANCE":
       return callAI({
-        system:
+        system: sys(
           "You compute and interpret trade performance using numeric inputs. Identify strengths shown.",
+          os,
+          ["risk_prompt"],
+        ),
         user: `Trade: ${JSON.stringify(ctx.trade)}\nResult: ${JSON.stringify(ctx.result)}\nReview: ${JSON.stringify(ctx.priorPost.REVIEW ?? null)}`,
         schema: baseSchema(
           {
@@ -109,8 +138,11 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
 
     case "LEARNING_UPDATE":
       return callAI({
-        system:
+        system: sys(
           "You aggregate the last 24 trades plus this trade's mistakes and strengths to surface recurring patterns. Output canonical short labels suitable for tagging.",
+          os,
+          ["learning_prompt"],
+        ),
         user: `This trade mistakes: ${JSON.stringify(ctx.priorPost.MISTAKE ?? null)}\nThis trade strengths: ${JSON.stringify(ctx.priorPost.PERFORMANCE ?? null)}\nLast 24 trades summary: ${JSON.stringify(ctx.recentTrades)}`,
         schema: baseSchema(
           {
@@ -146,8 +178,11 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
 
     case "COACH_REPORT":
       return callAI({
-        system:
-          "You are the empathetic head coach delivering the final post-trade report. Actionable, kind, specific.",
+        system: sys(
+          "You are the MetaBrain head coach delivering the final post-trade report. Actionable, kind, specific.",
+          os,
+          ["psychology_prompt", "education_prompt"],
+        ),
         user: `All pre-trade analyses: ${JSON.stringify(ctx.priorPre)}\nAll post-trade stages so far: ${JSON.stringify(ctx.priorPost)}\nReflections: ${JSON.stringify(ctx.reflections)}`,
         schema: baseSchema(
           {
@@ -161,3 +196,4 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
       });
   }
 }
+

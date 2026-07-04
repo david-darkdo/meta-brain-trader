@@ -372,6 +372,101 @@ export type Database = {
           },
         ]
       }
+      strategy_os: {
+        Row: {
+          community_prompt: string
+          core_strategy_prompt: string
+          created_at: string
+          education_prompt: string
+          entry_confirmation_prompt: string
+          filter_prompt: string
+          id: string
+          investor_prompt: string
+          learning_prompt: string
+          psychology_prompt: string
+          risk_prompt: string
+          system_identity_prompt: string
+          updated_at: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          community_prompt?: string
+          core_strategy_prompt?: string
+          created_at?: string
+          education_prompt?: string
+          entry_confirmation_prompt?: string
+          filter_prompt?: string
+          id?: string
+          investor_prompt?: string
+          learning_prompt?: string
+          psychology_prompt?: string
+          risk_prompt?: string
+          system_identity_prompt?: string
+          updated_at?: string
+          user_id: string
+          version?: number
+        }
+        Update: {
+          community_prompt?: string
+          core_strategy_prompt?: string
+          created_at?: string
+          education_prompt?: string
+          entry_confirmation_prompt?: string
+          filter_prompt?: string
+          id?: string
+          investor_prompt?: string
+          learning_prompt?: string
+          psychology_prompt?: string
+          risk_prompt?: string
+          system_identity_prompt?: string
+          updated_at?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: []
+      }
+      strategy_os_versions: {
+        Row: {
+          created_at: string
+          engine_key: string
+          id: string
+          new_content: string
+          previous_content: string
+          strategy_os_id: string
+          user_id: string
+          version: number
+        }
+        Insert: {
+          created_at?: string
+          engine_key: string
+          id?: string
+          new_content?: string
+          previous_content?: string
+          strategy_os_id: string
+          user_id: string
+          version: number
+        }
+        Update: {
+          created_at?: string
+          engine_key?: string
+          id?: string
+          new_content?: string
+          previous_content?: string
+          strategy_os_id?: string
+          user_id?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "strategy_os_versions_strategy_os_id_fkey"
+            columns: ["strategy_os_id"]
+            isOneToOne: false
+            referencedRelation: "strategy_os"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       strategy_profiles: {
         Row: {
           area_of_interest: Json
