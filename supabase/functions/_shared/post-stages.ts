@@ -2,6 +2,7 @@
 // abstraction; does NOT alter pre-trade stages.
 
 import { callAI, educationalBlock } from "./ai.ts";
+import type { PromptOS } from "./stages.ts";
 
 export type PostStageName =
   | "REVIEW"
@@ -29,11 +30,29 @@ export type PostStageContext = {
   trade: Record<string, unknown>;
   result: Record<string, unknown> | null;
   reflections: Array<Record<string, unknown>>;
-  priorPre: Record<string, unknown>; // pre-trade analyses keyed by stage
+  priorPre: Record<string, unknown>;
   priorPost: Record<string, unknown>;
   recentTrades: Array<Record<string, unknown>>;
   screenshotUrls: string[];
+  promptOS: PromptOS | null;
 };
+
+function block(title: string, body?: string) {
+  const b = (body ?? "").trim();
+  if (!b) return "";
+  return `\n\n=== ${title} ===\n${b}\n=== END ${title} ===`;
+}
+
+function sys(base: string, os: PromptOS | null, engines: (keyof PromptOS)[]) {
+  const identity = os?.system_identity_prompt?.trim();
+  const parts = [
+    identity ? block("METABRAIN SYSTEM IDENTITY", identity) : "",
+    ...engines.map((k) => block(k.replace(/_/g, " ").toUpperCase(), os?.[k])),
+  ]
+    .filter(Boolean)
+    .join("");
+  return `${base}${parts}`;
+}
 
 export async function runPostStage(stage: PostStageName, ctx: PostStageContext) {
   switch (stage) {
