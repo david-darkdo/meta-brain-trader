@@ -59,7 +59,7 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
         system: sys(
           "You review what actually happened in the trade vs. the original plan and pre-trade analysis. Be objective.",
           os,
-          ["core_strategy_prompt", "entry_confirmation_prompt"],
+          ["core_strategy_prompt"],
         ),
         user: `Trade plan: ${JSON.stringify(ctx.trade)}\nResult: ${JSON.stringify(ctx.result)}\nPre-trade analyses: ${JSON.stringify(ctx.priorPre)}\nReflections: ${JSON.stringify(ctx.reflections)}`,
         images: ctx.screenshotUrls,
