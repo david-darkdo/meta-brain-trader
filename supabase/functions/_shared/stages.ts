@@ -1,4 +1,9 @@
 import { callAI, educationalBlock } from "./ai.ts";
+import {
+  buildOrchestratedPrompt,
+  type EngineKey,
+  type PromptOS as OrchestratorPromptOS,
+} from "./orchestrator.ts";
 
 export type StageName =
   | "BLIND"
@@ -31,18 +36,7 @@ export type StrategyIdentity = {
   prompt_config?: Record<string, unknown>;
 };
 
-export type PromptOS = {
-  system_identity_prompt?: string;
-  core_strategy_prompt?: string;
-  entry_confirmation_prompt?: string;
-  risk_prompt?: string;
-  filter_prompt?: string;
-  psychology_prompt?: string;
-  learning_prompt?: string;
-  education_prompt?: string;
-  community_prompt?: string;
-  investor_prompt?: string;
-};
+export type PromptOS = OrchestratorPromptOS;
 
 export type StageContext = {
   trade: Record<string, unknown>;
@@ -53,21 +47,13 @@ export type StageContext = {
   recentTrades?: Array<Record<string, unknown>>;
 };
 
-function block(title: string, body?: string) {
-  const b = (body ?? "").trim();
-  if (!b) return "";
-  return `\n\n=== ${title} ===\n${b}\n=== END ${title} ===`;
-}
-
-function sys(base: string, os: PromptOS | null, engines: (keyof PromptOS)[]) {
-  const identity = os?.system_identity_prompt?.trim();
-  const parts = [
-    identity ? block("METABRAIN SYSTEM IDENTITY", identity) : "",
-    ...engines.map((k) => block(k.replace(/_/g, " ").toUpperCase(), os?.[k])),
-  ]
-    .filter(Boolean)
-    .join("");
-  return `${base}${parts}`;
+// Orchestrated system prompt for the PRETRADE pipeline. `engines` narrows
+// within the pipeline's allowed manifest; the orchestrator throws if a
+// blocked engine (community / investor) is ever requested here.
+function sys(base: string, os: PromptOS | null, engines: EngineKey[]) {
+  const requested: EngineKey[] = ["system_identity_prompt", ...engines];
+  const { system } = buildOrchestratedPrompt("PRETRADE", base, os, requested);
+  return system;
 }
 
 export async function runStage(stage: StageName, ctx: StageContext) {
