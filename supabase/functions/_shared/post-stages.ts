@@ -79,7 +79,7 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
         system: sys(
           "You identify mistakes and process errors in this trade. Tag each with a short canonical label from the Psychology + Filter engines.",
           os,
-          ["psychology_prompt", "filter_prompt", "risk_prompt"],
+          ["psychology_prompt", "risk_prompt"],
         ),
         user: `Review: ${JSON.stringify(ctx.priorPost.REVIEW ?? null)}\nTrade: ${JSON.stringify(ctx.trade)}\nResult: ${JSON.stringify(ctx.result)}\nReflections: ${JSON.stringify(ctx.reflections)}`,
         schema: baseSchema(
