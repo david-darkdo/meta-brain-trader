@@ -6,6 +6,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "../_shared/cors.ts";
 import { STAGE_SEQUENCE, runStage, type StageContext, type StageName } from "../_shared/stages.ts";
+import { loadedEngines, blockedEngines, logExecution, updateExecutionLog } from "../_shared/orchestrator.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
