@@ -11,6 +11,7 @@ import {
   type PostStageContext,
   type PostStageName,
 } from "../_shared/post-stages.ts";
+import { loadedEngines, blockedEngines, logExecution, updateExecutionLog } from "../_shared/orchestrator.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -166,6 +167,17 @@ async function runPipeline(tradeId: string) {
       .update({ processing_step: stepMap[stage] })
       .eq("trade_id", tradeId);
 
+    const decisionId = await logExecution({
+      pipeline_id: "POSTTRADE",
+      stage,
+      trade_id: tradeId,
+      user_id: trade.user_id,
+      loaded_prompts: loadedEngines("POSTTRADE"),
+      blocked_prompts: blockedEngines("POSTTRADE"),
+      execution_order: loadedEngines("POSTTRADE"),
+      status: "STARTED",
+    });
+
     try {
       const { output, provider, model } = await runPostStage(stage, ctx);
       ctx.priorPost[stage] = output;
@@ -189,8 +201,11 @@ async function runPipeline(tradeId: string) {
       if (stage === "LEARNING_UPDATE") {
         await recordInsights(trade.user_id, tradeId, output as Record<string, unknown>);
       }
+
+      if (decisionId) await updateExecutionLog(decisionId, { status: "COMPLETED" });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      if (decisionId) await updateExecutionLog(decisionId, { status: "ABORTED", error: msg });
       await admin
         .from("trades")
         .update({

@@ -1,8 +1,16 @@
 // Post-trade pipeline stage definitions. Reuses the model-agnostic callAI
-// abstraction; does NOT alter pre-trade stages.
+// abstraction; does NOT alter pre-trade stages. All system prompts are
+// constructed via the code-level Prompt Orchestration Engine (POSTTRADE
+// manifest) — Community, Investor, and Entry Confirmation are blocked here.
 
 import { callAI, educationalBlock } from "./ai.ts";
-import type { PromptOS } from "./stages.ts";
+import {
+  buildOrchestratedPrompt,
+  type EngineKey,
+  type PromptOS as OrchestratorPromptOS,
+} from "./orchestrator.ts";
+
+export type PromptOS = OrchestratorPromptOS;
 
 export type PostStageName =
   | "REVIEW"
@@ -37,21 +45,10 @@ export type PostStageContext = {
   promptOS: PromptOS | null;
 };
 
-function block(title: string, body?: string) {
-  const b = (body ?? "").trim();
-  if (!b) return "";
-  return `\n\n=== ${title} ===\n${b}\n=== END ${title} ===`;
-}
-
-function sys(base: string, os: PromptOS | null, engines: (keyof PromptOS)[]) {
-  const identity = os?.system_identity_prompt?.trim();
-  const parts = [
-    identity ? block("METABRAIN SYSTEM IDENTITY", identity) : "",
-    ...engines.map((k) => block(k.replace(/_/g, " ").toUpperCase(), os?.[k])),
-  ]
-    .filter(Boolean)
-    .join("");
-  return `${base}${parts}`;
+function sys(base: string, os: PromptOS | null, engines: EngineKey[]) {
+  const requested: EngineKey[] = ["system_identity_prompt", ...engines];
+  const { system } = buildOrchestratedPrompt("POSTTRADE", base, os, requested);
+  return system;
 }
 
 export async function runPostStage(stage: PostStageName, ctx: PostStageContext) {
@@ -62,7 +59,7 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
         system: sys(
           "You review what actually happened in the trade vs. the original plan and pre-trade analysis. Be objective.",
           os,
-          ["core_strategy_prompt", "entry_confirmation_prompt"],
+          ["core_strategy_prompt"],
         ),
         user: `Trade plan: ${JSON.stringify(ctx.trade)}\nResult: ${JSON.stringify(ctx.result)}\nPre-trade analyses: ${JSON.stringify(ctx.priorPre)}\nReflections: ${JSON.stringify(ctx.reflections)}`,
         images: ctx.screenshotUrls,
@@ -82,7 +79,7 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
         system: sys(
           "You identify mistakes and process errors in this trade. Tag each with a short canonical label from the Psychology + Filter engines.",
           os,
-          ["psychology_prompt", "filter_prompt", "risk_prompt"],
+          ["psychology_prompt", "risk_prompt"],
         ),
         user: `Review: ${JSON.stringify(ctx.priorPost.REVIEW ?? null)}\nTrade: ${JSON.stringify(ctx.trade)}\nResult: ${JSON.stringify(ctx.result)}\nReflections: ${JSON.stringify(ctx.reflections)}`,
         schema: baseSchema(

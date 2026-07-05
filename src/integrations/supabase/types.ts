@@ -154,6 +154,48 @@ export type Database = {
         }
         Relationships: []
       }
+      orchestration_logs: {
+        Row: {
+          blocked_prompts: Json
+          created_at: string
+          decision_id: string
+          error_message: string | null
+          execution_order: Json
+          loaded_prompts: Json
+          pipeline_id: string
+          stage: string
+          status: string
+          trade_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          blocked_prompts?: Json
+          created_at?: string
+          decision_id?: string
+          error_message?: string | null
+          execution_order?: Json
+          loaded_prompts?: Json
+          pipeline_id: string
+          stage: string
+          status?: string
+          trade_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          blocked_prompts?: Json
+          created_at?: string
+          decision_id?: string
+          error_message?: string | null
+          execution_order?: Json
+          loaded_prompts?: Json
+          pipeline_id?: string
+          stage?: string
+          status?: string
+          trade_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       profile_settings: {
         Row: {
           created_at: string

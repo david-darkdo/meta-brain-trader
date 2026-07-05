@@ -6,6 +6,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { corsHeaders } from "../_shared/cors.ts";
 import { STAGE_SEQUENCE, runStage, type StageContext, type StageName } from "../_shared/stages.ts";
+import { loadedEngines, blockedEngines, logExecution, updateExecutionLog } from "../_shared/orchestrator.ts";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -96,6 +97,17 @@ async function runPipeline(tradeId: string) {
     const aiStage: "BLIND" | "COMPARATIVE" | "VERDICT" =
       stage === "BLIND" ? "BLIND" : stage === "VERDICT" ? "VERDICT" : "COMPARATIVE";
 
+    const decisionId = await logExecution({
+      pipeline_id: "PRETRADE",
+      stage,
+      trade_id: tradeId,
+      user_id: trade.user_id,
+      loaded_prompts: loadedEngines("PRETRADE"),
+      blocked_prompts: blockedEngines("PRETRADE"),
+      execution_order: loadedEngines("PRETRADE"),
+      status: "STARTED",
+    });
+
     try {
       const { output, provider, model } = await runStage(stage as StageName, ctx);
       priorAnalyses[stage] = output;
@@ -125,8 +137,11 @@ async function runPipeline(tradeId: string) {
         entry_score: entryScore,
         coaching_notes: coachingNotes,
       });
+
+      if (decisionId) await updateExecutionLog(decisionId, { status: "COMPLETED" });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
+      if (decisionId) await updateExecutionLog(decisionId, { status: "ABORTED", error: msg });
       await admin
         .from("trades")
         .update({ processing_step: "FAILED", processing_error: `${stage}: ${msg}` })
@@ -141,6 +156,7 @@ async function runPipeline(tradeId: string) {
       throw err;
     }
   }
+
 
   await admin
     .from("trades")
