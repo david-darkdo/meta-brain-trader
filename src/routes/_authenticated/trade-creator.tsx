@@ -31,6 +31,7 @@ const tradeSchema = z.object({
 type ShotType = "ENTRY" | "MANAGEMENT" | "EXIT" | "RESULT" | "ACCOUNT" | "CONTEXT";
 type Screenshot = { file: File; label: string; id: string; shot_type: ShotType };
 const SHOT_TYPES: ShotType[] = ["CONTEXT", "ENTRY", "MANAGEMENT", "EXIT", "RESULT", "ACCOUNT"];
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
 
 function TradeCreator() {
   const navigate = useNavigate();
@@ -45,6 +46,7 @@ function TradeCreator() {
     account_size: "",
     risk_pct: "",
     session: "",
+    day_of_week: DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1] as string,
     notes: "",
   });
   const [shots, setShots] = useState<Screenshot[]>([]);
@@ -91,6 +93,7 @@ function TradeCreator() {
         account_size: parsed.data.account_size ?? null,
         risk_pct: parsed.data.risk_pct ?? null,
         session: parsed.data.session || null,
+        day_of_week: form.day_of_week || null,
         notes: parsed.data.notes || null,
       };
 
@@ -192,6 +195,15 @@ function TradeCreator() {
               </Select>
             </div>
             <div className="space-y-1.5">
+              <Label>Day of week</Label>
+              <Select value={form.day_of_week} onValueChange={(v) => update("day_of_week", v)}>
+                <SelectTrigger><SelectValue placeholder="Select day" /></SelectTrigger>
+                <SelectContent>
+                  {DAYS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="notes">Notes</Label>
               <Textarea id="notes" rows={4} placeholder="Thesis, context, anything worth remembering…" value={form.notes} onChange={(e) => update("notes", e.target.value)} />
             </div>
@@ -251,6 +263,7 @@ function TradeCreator() {
             <Row k="Entry / SL / TP" v={`${form.entry_price || "—"} / ${form.stop_loss || "—"} / ${form.take_profit || "—"}`} />
             <Row k="Account / Risk" v={`${form.account_size || "—"} · ${form.risk_pct || "—"}%`} />
             <Row k="Session" v={form.session || "—"} />
+            <Row k="Day" v={form.day_of_week || "—"} />
             <Row k="Screenshots" v={`${shots.length} attached`} />
             <Row k="Status" v="DRAFT" />
           </CardContent>
