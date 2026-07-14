@@ -93,6 +93,7 @@ function TradeCreator() {
         account_size: parsed.data.account_size ?? null,
         risk_pct: parsed.data.risk_pct ?? null,
         session: parsed.data.session || null,
+        day_of_week: form.day_of_week || null,
         notes: parsed.data.notes || null,
       };
 
