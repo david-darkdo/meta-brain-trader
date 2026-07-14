@@ -595,6 +595,7 @@ export type Database = {
           account_size: number | null
           created_at: string
           current_strategy_profile_id: string | null
+          day_of_week: string | null
           direction: string
           entry_price: number | null
           executed: boolean
@@ -616,6 +617,7 @@ export type Database = {
           account_size?: number | null
           created_at?: string
           current_strategy_profile_id?: string | null
+          day_of_week?: string | null
           direction: string
           entry_price?: number | null
           executed?: boolean
@@ -637,6 +639,7 @@ export type Database = {
           account_size?: number | null
           created_at?: string
           current_strategy_profile_id?: string | null
+          day_of_week?: string | null
           direction?: string
           entry_price?: number | null
           executed?: boolean
