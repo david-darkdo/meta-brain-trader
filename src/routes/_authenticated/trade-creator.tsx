@@ -195,6 +195,15 @@ function TradeCreator() {
               </Select>
             </div>
             <div className="space-y-1.5">
+              <Label>Day of week</Label>
+              <Select value={form.day_of_week} onValueChange={(v) => update("day_of_week", v)}>
+                <SelectTrigger><SelectValue placeholder="Select day" /></SelectTrigger>
+                <SelectContent>
+                  {DAYS.map((d) => <SelectItem key={d} value={d}>{d}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1.5">
               <Label htmlFor="notes">Notes</Label>
               <Textarea id="notes" rows={4} placeholder="Thesis, context, anything worth remembering…" value={form.notes} onChange={(e) => update("notes", e.target.value)} />
             </div>
