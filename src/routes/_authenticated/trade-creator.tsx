@@ -31,6 +31,7 @@ const tradeSchema = z.object({
 type ShotType = "ENTRY" | "MANAGEMENT" | "EXIT" | "RESULT" | "ACCOUNT" | "CONTEXT";
 type Screenshot = { file: File; label: string; id: string; shot_type: ShotType };
 const SHOT_TYPES: ShotType[] = ["CONTEXT", "ENTRY", "MANAGEMENT", "EXIT", "RESULT", "ACCOUNT"];
+const DAYS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
 
 function TradeCreator() {
   const navigate = useNavigate();
@@ -45,6 +46,7 @@ function TradeCreator() {
     account_size: "",
     risk_pct: "",
     session: "",
+    day_of_week: DAYS[new Date().getDay() === 0 ? 6 : new Date().getDay() - 1] as string,
     notes: "",
   });
   const [shots, setShots] = useState<Screenshot[]>([]);
