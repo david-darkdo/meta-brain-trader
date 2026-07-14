@@ -263,6 +263,7 @@ function TradeCreator() {
             <Row k="Entry / SL / TP" v={`${form.entry_price || "—"} / ${form.stop_loss || "—"} / ${form.take_profit || "—"}`} />
             <Row k="Account / Risk" v={`${form.account_size || "—"} · ${form.risk_pct || "—"}%`} />
             <Row k="Session" v={form.session || "—"} />
+            <Row k="Day" v={form.day_of_week || "—"} />
             <Row k="Screenshots" v={`${shots.length} attached`} />
             <Row k="Status" v="DRAFT" />
           </CardContent>
