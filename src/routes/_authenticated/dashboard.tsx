@@ -1,10 +1,24 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { deleteSingleTrade } from "@/lib/trade-delete-service";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { TrendingUp, BarChart3, Target, BookOpen, Plus, AlertTriangle, Trophy, ShieldCheck, Handshake } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { TrendingUp, BarChart3, Target, BookOpen, Plus, AlertTriangle, Trophy, ShieldCheck, Handshake, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   head: () => ({ meta: [{ title: "Dashboard — MetaBrain Trader" }] }),
@@ -12,6 +26,9 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
 });
 
 function Dashboard() {
+  const qc = useQueryClient();
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+
   const tradesQ = useQuery({
     queryKey: ["trades", "recent"],
     queryFn: async () => {
@@ -43,6 +60,24 @@ function Dashboard() {
         .limit(10);
       return data ?? [];
     },
+  });
+
+  const deleteSingleMut = useMutation({
+    mutationFn: async (tradeId: string) => {
+      setDeletingId(tradeId);
+      await deleteSingleTrade(tradeId);
+    },
+    onSuccess: () => {
+      toast.success("Trade deleted");
+      qc.invalidateQueries({ queryKey: ["trades"] });
+      qc.invalidateQueries({ queryKey: ["journal"] });
+      qc.invalidateQueries({ queryKey: ["dashboard_metrics"] });
+      qc.invalidateQueries({ queryKey: ["learning_insights"] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Failed to delete trade");
+    },
+    onSettled: () => setDeletingId(null),
   });
 
   const m = metricsQ.data;
@@ -159,9 +194,9 @@ function Dashboard() {
           ) : (
             <ul className="divide-y divide-border">
               {tradesQ.data.map((t) => (
-                <li key={t.trade_id}>
+                <li key={t.trade_id} className="flex items-center justify-between gap-2 py-2">
                   <Link to="/trade-detail/$id" params={{ id: t.trade_id }}
-                    className="-mx-2 flex items-center justify-between gap-4 rounded-md px-2 py-3 hover:bg-secondary/40">
+                    className="flex flex-1 items-center justify-between gap-4 rounded-md p-2 hover:bg-secondary/40">
                     <div className="flex items-center gap-3">
                       <span className={`inline-block h-2 w-2 rounded-full ${t.direction === "LONG" ? "bg-success" : "bg-destructive"}`} />
                       <div>
@@ -171,6 +206,36 @@ function Dashboard() {
                     </div>
                     <span className="rounded-md border border-border bg-secondary px-2 py-0.5 text-xs text-muted-foreground">{t.trade_status}</span>
                   </Link>
+
+                  <AlertDialog>
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 gap-1 border-destructive/30 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        disabled={deletingId === t.trade_id}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" /> Delete
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent>
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Trade ({t.pair})?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          This will permanently delete this trade, its screenshots, reflections, and AI analysis records.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                          onClick={() => deleteSingleMut.mutate(t.trade_id)}
+                        >
+                          Delete Trade
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
                 </li>
               ))}
             </ul>
