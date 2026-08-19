@@ -6,10 +6,18 @@ import { useQueryClient } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
-  beforeLoad: async () => {
-    const { data, error } = await supabase.auth.getUser();
-    if (error || !data.user) throw redirect({ to: "/auth" });
-    return { user: data.user };
+  beforeLoad: async ({ location }) => {
+    try {
+      const { data, error } = await supabase.auth.getUser();
+      if (error || !data?.user) {
+        throw redirect({ to: "/auth", search: { redirect: location.pathname } });
+      }
+      return { user: data.user };
+    } catch (err: any) {
+      if (err?.to || err?.isRedirect) throw err;
+      console.warn("Auth beforeLoad error, redirecting to /auth:", err);
+      throw redirect({ to: "/auth", search: { redirect: location.pathname } });
+    }
   },
   component: AuthenticatedLayout,
 });
