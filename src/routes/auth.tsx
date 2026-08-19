@@ -32,7 +32,7 @@ function AuthPage() {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (data.user) navigate({ to: search.redirect ?? "/dashboard" });
-    });
+    }).catch(() => null);
   }, [navigate, search.redirect]);
 
   async function onSubmit(e: React.FormEvent) {
@@ -60,8 +60,12 @@ function AuthPage() {
         toast.success("Password reset email sent.");
         setMode("signin");
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Something went wrong";
+    } catch (err: any) {
+      console.error("Auth error:", err);
+      let msg = err?.message || err?.error_description || (typeof err === "string" ? err : String(err));
+      if (msg.includes("Failed to fetch") || msg.includes("fetch failed") || msg.includes("NetworkError")) {
+        msg = "Unable to connect to Supabase database. Please check your Supabase project status in the Supabase Dashboard.";
+      }
       toast.error(msg);
     } finally {
       setBusy(false);
