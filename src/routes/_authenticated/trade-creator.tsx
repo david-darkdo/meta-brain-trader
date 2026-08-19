@@ -92,11 +92,15 @@ function TradeCreator() {
       const userId = userRes.user.id;
 
       // Ensure user record exists in public.users to avoid RLS/FK errors
-      await supabase.from("users").upsert({
-        user_id: userId,
-        email: userRes.user.email || null,
-        subscription_tier: "FREE",
-      }, { onConflict: "user_id" }).catch(() => null);
+      try {
+        await supabase.from("users").upsert({
+          user_id: userId,
+          email: userRes.user.email || null,
+          subscription_tier: "FREE",
+        }, { onConflict: "user_id" });
+      } catch (uErr) {
+        console.warn("User upsert notice:", uErr);
+      }
 
       const insertPayload: Record<string, any> = {
         user_id: userId,
