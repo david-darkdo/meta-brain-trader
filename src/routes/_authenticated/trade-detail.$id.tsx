@@ -1,14 +1,26 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { deleteSingleTrade } from "@/lib/trade-delete-service";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Sparkles, Brain, Lock } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { ArrowLeft, Sparkles, Brain, Lock, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { PipelineStatus } from "@/components/pipeline-status";
 import { PostPipelineStatus } from "@/components/post-pipeline-status";
@@ -47,6 +59,7 @@ const POST_STEPS = new Set(["POST_PENDING","POST_REVIEW","POST_MISTAKE","POST_PE
 
 function TradeDetail() {
   const { id } = Route.useParams();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const [tab, setTab] = useState<"pre" | "post" | "reflection">("pre");
 
@@ -123,6 +136,19 @@ function TradeDetail() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["trade", id] }),
   });
 
+  const deleteMut = useMutation({
+    mutationFn: () => deleteSingleTrade(id),
+    onSuccess: () => {
+      toast.success("Trade deleted");
+      qc.invalidateQueries({ queryKey: ["journal"] });
+      qc.invalidateQueries({ queryKey: ["trades"] });
+      qc.invalidateQueries({ queryKey: ["dashboard_metrics"] });
+      qc.invalidateQueries({ queryKey: ["learning_insights"] });
+      navigate({ to: "/journal" });
+    },
+    onError: (e: any) => toast.error(e?.message || "Failed to delete trade"),
+  });
+
   const shotsQ = useQuery({
     queryKey: ["trade", id, "pre-screenshots"],
     queryFn: async () => {
@@ -187,6 +213,31 @@ function TradeDetail() {
               <Brain className="h-4 w-4" />{startPost.isPending ? "Starting…" : "Run post-trade analysis"}
             </Button>
           )}
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button size="sm" variant="outline" className="gap-1.5 border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive">
+                <Trash2 className="h-4 w-4" /> Delete Trade
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete Trade ({t.pair})?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This will permanently delete this trade, its screenshots, reflections, and AI analysis records. This action cannot be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  onClick={() => deleteMut.mutate()}
+                >
+                  Delete Trade
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
@@ -225,54 +276,69 @@ function TradeDetail() {
             <CardHeader><CardTitle className="text-base">Pre-trade screenshots</CardTitle></CardHeader>
             <CardContent>
               {shotsQ.isLoading ? (
-                <p className="text-sm text-muted-foreground">Loading…</p>
+                <p className="text-sm text-muted-foreground">Loading screenshots…</p>
               ) : !shotsQ.data || shotsQ.data.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No screenshots attached.</p>
+                <p className="text-sm text-muted-foreground">No pre-trade screenshots uploaded.</p>
               ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="grid gap-4 sm:grid-cols-2">
                   {shotsQ.data.map((s) => (
-                    <figure key={s.screenshot_id} className="space-y-1">
+                    <div key={s.screenshot_id} className="overflow-hidden rounded-md border border-border bg-card">
                       {s.signedUrl ? (
-                        <img src={s.signedUrl} alt={s.user_label ?? ""} className="w-full rounded-md border border-border" />
-                      ) : (<div className="aspect-video rounded-md bg-muted" />)}
-                      <figcaption className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>{s.user_label || s.shot_type}</span>
-                        {s.is_primary && <span className="text-primary">Primary</span>}
-                      </figcaption>
-                    </figure>
+                        <a href={s.signedUrl} target="_blank" rel="noreferrer">
+                          <img src={s.signedUrl} alt={s.user_label ?? "Pre-trade chart"} className="h-48 w-full object-cover" />
+                        </a>
+                      ) : (
+                        <div className="flex h-48 items-center justify-center text-xs text-muted-foreground">Image unavailable</div>
+                      )}
+                      <div className="p-3 text-xs">
+                        <div className="flex items-center justify-between font-medium">
+                          <span>{s.shot_type}</span>
+                          {s.is_primary && <Badge variant="outline" className="text-[10px]">Primary</Badge>}
+                        </div>
+                        {s.user_label && <div className="mt-1 text-muted-foreground">{s.user_label}</div>}
+                      </div>
+                    </div>
                   ))}
                 </div>
               )}
             </CardContent>
           </Card>
 
-          <AiAnalysesPanel tradeId={t.trade_id} phase="PRE" />
+          <AiAnalysesPanel tradeId={t.trade_id} />
         </TabsContent>
 
         <TabsContent value="post" className="space-y-6 pt-4">
-          <ResultForm tradeId={t.trade_id} />
-          <PostScreenshotUploader tradeId={t.trade_id} userId={t.user_id} />
-          <AiAnalysesPanel tradeId={t.trade_id} phase="POST" />
+          <ResultForm tradeId={t.trade_id} existingResult={resultQ.data} />
+          <PostScreenshotUploader tradeId={t.trade_id} />
+          {resultQ.data && (
+            <Card>
+              <CardHeader><CardTitle className="text-base">Post-trade analysis</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Run the post-trade AI pipeline to audit execution vs. strategy, log behavioral mistakes or strengths, and extract lessons.
+                </p>
+                {canRunPost && (
+                  <Button onClick={() => startPost.mutate()} disabled={startPost.isPending} className="gap-2">
+                    <Brain className="h-4 w-4" />{startPost.isPending ? "Starting…" : "Run post-trade analysis"}
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </TabsContent>
 
         <TabsContent value="reflection" className="space-y-6 pt-4">
-          {reflectionUnlocked ? (
-            <ReflectionSections tradeId={t.trade_id} />
-          ) : (
-            <Card><CardContent className="py-10 text-center text-sm text-muted-foreground">
-              Reflection unlocks after the post-trade AI audit completes.
-            </CardContent></Card>
-          )}
+          <ReflectionSections tradeId={t.trade_id} />
         </TabsContent>
       </Tabs>
     </div>
   );
 }
 
-function Field({ k, v }: { k: string; v: string | number | null }) {
+function Field({ k, v }: { k: string; v: number | string | null }) {
   return (
     <div>
-      <div className="text-muted-foreground">{k}</div>
+      <div className="text-xs text-muted-foreground">{k}</div>
       <div className="font-medium">{v ?? "—"}</div>
     </div>
   );
