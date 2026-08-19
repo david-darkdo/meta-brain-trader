@@ -51,7 +51,7 @@ function TradeCreator() {
     account_size: "10000",
     risk_pct: "1.0",
     session: "London",
-    day_of_week: new Date().toLocaleDateString("en-US", { weekday: "Monday" }),
+    day_of_week: new Date().toLocaleDateString("en-US", { weekday: "long" }),
     notes: "",
   });
 
