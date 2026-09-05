@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ArrowLeft, Upload, X } from "lucide-react";
+import { ArrowLeft, Sparkles, Upload, X } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/trade-creator")({
@@ -78,7 +78,7 @@ function TradeCreator() {
     });
   }
 
-  async function save() {
+  async function save(mode: "draft" | "run" = "draft") {
     const parsed = tradeSchema.safeParse(form);
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message);
@@ -104,7 +104,8 @@ function TradeCreator() {
 
       const insertPayload: Record<string, any> = {
         user_id: userId,
-        trade_status: "DRAFT" as const,
+        trade_status: mode === "run" ? ("PRE_ANALYSIS" as const) : ("DRAFT" as const),
+        processing_step: "PENDING" as const,
         pair: parsed.data.pair.toUpperCase().trim(),
         direction: parsed.data.direction,
         entry_price: parsed.data.entry_price ?? null,
@@ -178,13 +179,41 @@ function TradeCreator() {
         }
       }
 
-      toast.success("Trade saved as draft");
+      if (mode === "run") {
+        // Trigger orchestrate-pipeline edge function immediately
+        try {
+          const { data: { session } } = await supabase.auth.getSession();
+          const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/orchestrate-pipeline`;
+          const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+            apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+          };
+          if (session?.access_token) {
+            headers["Authorization"] = `Bearer ${session.access_token}`;
+          }
+          const fnRes = await fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ trade_id: tradeId }),
+          });
+          if (!fnRes.ok) {
+            const txt = await fnRes.text();
+            console.warn("Pipeline trigger notification:", txt);
+          }
+        } catch (fnErr) {
+          console.warn("Pipeline trigger network error:", fnErr);
+        }
+        toast.success("Trade saved — executing AI analysis pipeline");
+      } else {
+        toast.success("Trade saved as draft");
+      }
+
       navigate({ to: "/trade-detail/$id", params: { id: tradeId } });
     } catch (err: any) {
       console.error("Save trade error:", err);
       let errMsg = err?.message || err?.error_description || err?.details || (typeof err === "string" ? err : String(err));
-      if (errMsg.includes("Failed to fetch") || errMsg.includes("fetch failed") || errMsg.includes("NetworkError")) {
-        errMsg = "Unable to connect to Supabase database. Please check your Supabase project status in the Supabase Dashboard.";
+      if (errMsg.includes("schema cache") || errMsg.includes("PGRST205") || errMsg.includes("Failed to fetch") || errMsg.includes("fetch failed") || errMsg.includes("NetworkError")) {
+        errMsg = "Database connection or table permission error. Please verify your Supabase connection or table permissions.";
       }
       toast.error(errMsg || "Failed to save trade");
     } finally {
@@ -407,11 +436,29 @@ function TradeCreator() {
               </div>
             </div>
 
-            <div className="flex justify-between pt-2">
-              <Button variant="outline" onClick={() => setStep(2)}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
-              <Button onClick={save} disabled={busy} className="bg-success hover:bg-success/90">
-                {busy ? "Saving draft..." : "Save draft"}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-border/50">
+              <Button variant="outline" onClick={() => setStep(2)}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back
               </Button>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => save("draft")}
+                  disabled={busy}
+                >
+                  {busy ? "Saving..." : "Save Draft"}
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => save("run")}
+                  disabled={busy}
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md shadow-primary/20"
+                >
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  {busy ? "Executing..." : "SAVE & RUN"}
+                </Button>
+              </div>
             </div>
           </CardContent>
         </Card>

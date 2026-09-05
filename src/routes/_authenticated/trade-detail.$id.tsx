@@ -183,16 +183,29 @@ function TradeDetail() {
   }, [id, qc]);
 
   const runFn = async (fn: "orchestrate-pipeline" | "post-trade-pipeline") => {
+    const { data: { session } } = await supabase.auth.getSession();
     const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fn}`;
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+    };
+    if (session?.access_token) {
+      headers["Authorization"] = `Bearer ${session.access_token}`;
+    }
     const res = await fetch(url, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
-      },
+      headers,
       body: JSON.stringify({ trade_id: id }),
     });
-    if (!res.ok) throw new Error(await res.text());
+    if (!res.ok) {
+      const errText = await res.text();
+      let errMsg = errText;
+      try {
+        const parsed = JSON.parse(errText);
+        if (parsed.error) errMsg = parsed.error;
+      } catch {}
+      throw new Error(errMsg);
+    }
   };
 
   const startPre = useMutation({
