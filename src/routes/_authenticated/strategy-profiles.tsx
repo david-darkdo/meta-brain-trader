@@ -41,6 +41,88 @@ type StrategyOSRow = {
   updated_at: string;
 } & Record<EngineKey, string>;
 
+const DEFAULT_PROMPTS: Record<EngineKey, string> = {
+  system_identity_prompt: `I am MetaBrainTrader, an AI trading validator and risk architect.
+
+My mission is ruthless capital accumulation and preservation for David Darkdo.
+
+I operate with:
+
+• zero emotion
+• strict rule-based logic
+• data-driven discretion
+• institutional market structure analysis
+• uncompromising risk management
+
+I do not guess. I do not gamble. I execute the strategy verbatim.`,
+
+  core_strategy_prompt: `FX David Darkdo Strategy:
+• Primary Strategy: Master Break & Retest
+• Secondary Strategy: Liquidity Sweep + Orderblock
+• Bias Timeframes: 1D, 4H
+• Entry Timeframes: 1H, 30M, 15M
+• Area of Interest (AOI): Mark prior swing highs/lows and HTF order blocks
+• Break Rules: Strong body close beyond level on entry timeframe
+• Retest Rules: Wait for retest of broken level with clear rejection wick
+• Structure Rules: Respect HTF structure; no counter-trend entries
+• Displacement: Require strong impulsive displacement candle on break
+• Liquidity: Hunt obvious equal highs/lows (BSL/SSL) before entry
+• Orderblock: Last opposing candle before displacement
+• Minimum Confirmations: 3 required`,
+
+  entry_confirmation_prompt: `Entry Confirmation Rules:
+• Confirm Break & Retest: True
+• Confirm Engulfing Candle: True
+• Confirm EMA Rejection & Alignment: True
+• Confirm Market Structure Shift (BOS/CHoCH): True
+• Confirm Liquidity Sweep: True
+• Confirm Orderblock Mitigation: True
+• Consecutive Candle Rule: No more than 2 same-direction candles before entry
+• Confirmation Scoring: Minimum 3 confirmations required for approval`,
+
+  risk_prompt: `Risk Engine Standard:
+• Standard Strategy Risk: 1.0% per trade
+• Max Daily Loss: 2.0%
+• Max Weekly Trades: 2-4 quality setups
+• Minimum Risk to Reward (R:R): 1:2.5 minimum (Target 1:3+)
+• Trailing Stop Logic: Move to Breakeven at 1:2R; trail swing lows/highs
+• Capital Preservation First: Disqualify any trade with unclear invalidation`,
+
+  filter_prompt: `Filter Rules:
+• Friday Rule: No new swing entries after 12:00 PM EST on Friday
+• High Impact News Filter: No entries within 30 minutes before/after Red Folder news
+• Session Filter: London & New York sessions only (07:00 - 16:00 GMT)
+• Spread Filter: Max 2.0 pips spread
+• Conflict Filter: Disqualify if 1D bias conflicts with 4H market structure`,
+
+  psychology_prompt: `Psychology & Discipline Protocol:
+• Pre-trade Affirmation: "I trade my plan with patience, detachment, and discipline."
+• FOMO Detection: Never chase price beyond planned entry level
+• Revenge Protection: Mandatory 30-minute cooling period after any loss
+• Emotional Reset: Step away from charts if feeling anxiety or impatience
+• Discipline Reminder: Skipping a bad setup is a profitable trading decision`,
+
+  learning_prompt: `Learning Engine Directives:
+• Lookback Memory: Last 24 closed trades
+• Pattern Identification: Track recurring strengths and recurring mistakes
+• Mistake Flagging: Tag repeated mistakes (e.g., early entry, moved stop loss)
+• Historical Edge: Validate if setup matches high win-rate conditions`,
+
+  education_prompt: `Education Engine Directives:
+• Concept Teaching: Explain why institutional order flow behaved in this manner
+• Deep Explanation: Provide institutional market narrative behind every setup
+• Practice Drill: Give specific chart observation drills to reinforce mastery`,
+
+  community_prompt: `Community Engine Directives:
+• Journal Sharing: Formulate clean, professional trade summaries for sharing
+• Constructive Review: Emphasize rule adherence over financial outcome`,
+
+  investor_prompt: `Investor Engine Directives:
+• Capital Allocation: Adhere strictly to master risk parameters
+• Drawdown Governance: Prioritize investor capital preservation above all else
+• Audit Trail: Every execution decision must be verifiable against Strategy OS rules`,
+};
+
 const ENGINES: {
   key: EngineKey;
   title: string;
@@ -125,27 +207,89 @@ function StrategyOS() {
   const q = useQuery({
     queryKey: ["strategy-os"],
     queryFn: async (): Promise<StrategyOSRow> => {
-      const { data: userRes } = await supabase.auth.getUser();
-      const uid = userRes.user?.id;
-      if (!uid) throw new Error("Not signed in");
+      // 1. Resolve active user session
+      let uid = "";
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        uid = sess.session?.user?.id ?? "";
+      } catch (_) {}
 
-      const { data: existing } = await supabase
+      if (!uid) {
+        try {
+          const { data: userRes } = await supabase.auth.getUser();
+          uid = userRes.user?.id ?? "";
+        } catch (_) {}
+      }
+
+      // 2. Fetch existing Strategy OS row from database
+      if (uid) {
+        const { data: existing } = await supabase
+          .from("strategy_os")
+          .select("*")
+          .eq("user_id", uid)
+          .maybeSingle();
+
+        if (existing) {
+          return populateMissingDefaults(existing as StrategyOSRow);
+        }
+      }
+
+      // 3. Fallback: Query under RLS
+      const { data: rlsRow } = await supabase
         .from("strategy_os")
         .select("*")
-        .eq("user_id", uid)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
 
-      if (existing) return existing as StrategyOSRow;
+      if (rlsRow) {
+        return populateMissingDefaults(rlsRow as StrategyOSRow);
+      }
 
-      const { data: created, error } = await supabase
-        .from("strategy_os")
-        .insert({ user_id: uid })
-        .select("*")
-        .single();
-      if (error) throw error;
-      return created as StrategyOSRow;
+      // 4. Create new Strategy OS row with defaults if authenticated
+      if (uid) {
+        try {
+          const { data: created } = await supabase
+            .from("strategy_os")
+            .insert({
+              user_id: uid,
+              system_identity_prompt: DEFAULT_PROMPTS.system_identity_prompt,
+              core_strategy_prompt: DEFAULT_PROMPTS.core_strategy_prompt,
+              entry_confirmation_prompt: DEFAULT_PROMPTS.entry_confirmation_prompt,
+              risk_prompt: DEFAULT_PROMPTS.risk_prompt,
+              filter_prompt: DEFAULT_PROMPTS.filter_prompt,
+              psychology_prompt: DEFAULT_PROMPTS.psychology_prompt,
+              learning_prompt: DEFAULT_PROMPTS.learning_prompt,
+              education_prompt: DEFAULT_PROMPTS.education_prompt,
+              community_prompt: DEFAULT_PROMPTS.community_prompt,
+              investor_prompt: DEFAULT_PROMPTS.investor_prompt,
+            })
+            .select("*")
+            .maybeSingle();
+
+          if (created) return created as StrategyOSRow;
+        } catch (_) {}
+      }
+
+      // 5. Reliable in-memory fallback so Strategy OS UI ALWAYS renders immediately
+      return {
+        id: "local-os",
+        user_id: uid || "local",
+        version: 1,
+        updated_at: new Date().toISOString(),
+        ...DEFAULT_PROMPTS,
+      };
     },
+    staleTime: 1000 * 60 * 5,
   });
+
+  const activeRow = q.data ?? {
+    id: "loading-os",
+    user_id: "local",
+    version: 1,
+    updated_at: new Date().toISOString(),
+    ...DEFAULT_PROMPTS,
+  };
 
   return (
     <div className="mx-auto max-w-4xl space-y-6 pb-24">
@@ -153,11 +297,9 @@ function StrategyOS() {
         <div className="flex items-center gap-2">
           <h1 className="text-3xl font-bold tracking-tight">Strategy OS</h1>
           <Badge variant="secondary">Prompt Memory</Badge>
-          {q.data && (
-            <Badge variant="outline" className="ml-auto">
-              v{q.data.version}
-            </Badge>
-          )}
+          <Badge variant="outline" className="ml-auto">
+            v{activeRow.version ?? 1}
+          </Badge>
         </div>
         <p className="text-sm text-muted-foreground">
           The permanent prompt operating system for MetaBrain. Paste complete AI
@@ -167,26 +309,35 @@ function StrategyOS() {
       </header>
 
       {q.isLoading && (
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Loading Strategy OS…
+        <div className="flex items-center gap-2 rounded-lg border border-border bg-card p-4 text-xs text-muted-foreground">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" /> Synchronizing prompt memory…
         </div>
       )}
 
-      {q.data &&
-        ENGINES.map((e) => (
-          <EngineEditor
-            key={e.key}
-            row={q.data!}
-            engine={e}
-            onSaved={(next) =>
-              qc.setQueryData(["strategy-os"], (old: StrategyOSRow | undefined) =>
-                old ? { ...old, ...next } : old,
-              )
-            }
-          />
-        ))}
+      {ENGINES.map((e) => (
+        <EngineEditor
+          key={e.key}
+          row={activeRow}
+          engine={e}
+          onSaved={(next) =>
+            qc.setQueryData(["strategy-os"], (old: StrategyOSRow | undefined) =>
+              old ? { ...old, ...next } : { ...activeRow, ...next },
+            )
+          }
+        />
+      ))}
     </div>
   );
+}
+
+function populateMissingDefaults(row: StrategyOSRow): StrategyOSRow {
+  const populated = { ...row };
+  for (const key of Object.keys(DEFAULT_PROMPTS) as EngineKey[]) {
+    if (!populated[key] || populated[key].trim() === "") {
+      populated[key] = DEFAULT_PROMPTS[key];
+    }
+  }
+  return populated;
 }
 
 function EngineEditor({
@@ -198,7 +349,7 @@ function EngineEditor({
   engine: { key: EngineKey; title: string; subtitle: string; placeholder: string };
   onSaved: (patch: Partial<StrategyOSRow>) => void;
 }) {
-  const initial = row[engine.key] ?? "";
+  const initial = row[engine.key] || DEFAULT_PROMPTS[engine.key] || "";
   const [value, setValue] = useState<string>(initial);
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "dirty">("idle");
   const [expanded, setExpanded] = useState(false);
@@ -207,30 +358,47 @@ function EngineEditor({
   const lastSaved = useRef<string>(initial);
 
   useEffect(() => {
-    setValue(row[engine.key] ?? "");
-    lastSaved.current = row[engine.key] ?? "";
+    const nextVal = row[engine.key] || DEFAULT_PROMPTS[engine.key] || "";
+    setValue(nextVal);
+    lastSaved.current = nextVal;
   }, [row, engine.key]);
 
   const save = useMutation({
     mutationFn: async (next: string) => {
+      if (row.id === "local-os" || row.id === "loading-os") {
+        // Upsert row if it wasn't in db yet
+        const { data: sess } = await supabase.auth.getSession();
+        const uid = sess.session?.user?.id;
+        if (!uid) throw new Error("Please sign in to save prompts to cloud.");
+        const { data, error } = await supabase
+          .from("strategy_os")
+          .upsert({ user_id: uid, [engine.key]: next }, { onConflict: "user_id" })
+          .select("id,version,updated_at")
+          .single();
+        if (error) throw error;
+        return { next, meta: data as { id: string; version: number; updated_at: string } };
+      }
+
       const { data, error } = await supabase
         .from("strategy_os")
         .update({ [engine.key]: next } as never)
         .eq("id", row.id)
-        .select("version,updated_at")
+        .select("id,version,updated_at")
         .single();
       if (error) throw error;
-      return { next, meta: data as { version: number; updated_at: string } };
+      return { next, meta: data as { id: string; version: number; updated_at: string } };
     },
     onMutate: () => setStatus("saving"),
     onSuccess: ({ next, meta }) => {
       lastSaved.current = next;
       setStatus("saved");
       onSaved({
+        id: meta.id || row.id,
         [engine.key]: next,
-        version: meta.version,
-        updated_at: meta.updated_at,
+        version: meta.version || (row.version + 1),
+        updated_at: meta.updated_at || new Date().toISOString(),
       } as Partial<StrategyOSRow>);
+      toast.success(`${engine.title} saved`);
       setTimeout(() => setStatus("idle"), 1200);
     },
     onError: (e) => {
@@ -244,7 +412,7 @@ function EngineEditor({
     setStatus(next === lastSaved.current ? "idle" : "dirty");
     if (timer.current) clearTimeout(timer.current);
     if (next === lastSaved.current) return;
-    timer.current = setTimeout(() => save.mutate(next), 1200);
+    timer.current = setTimeout(() => save.mutate(next), 1500);
   };
 
   const saveNow = () => {
@@ -260,11 +428,11 @@ function EngineEditor({
   );
 
   return (
-    <Card>
-      <CardHeader className="space-y-2">
+    <Card className="border-border shadow-sm">
+      <CardHeader className="space-y-2 pb-3">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-1">
-            <CardTitle className="text-base">{engine.title}</CardTitle>
+            <CardTitle className="text-base font-bold">{engine.title}</CardTitle>
             <p className="text-xs text-muted-foreground">{engine.subtitle}</p>
           </div>
           <div className="flex items-center gap-2">
@@ -273,7 +441,7 @@ function EngineEditor({
               variant="ghost"
               size="sm"
               onClick={() => setHistoryOpen(true)}
-              className="gap-1"
+              className="h-8 gap-1 text-xs"
             >
               <History className="h-3.5 w-3.5" /> History
             </Button>
@@ -281,7 +449,7 @@ function EngineEditor({
               variant="ghost"
               size="sm"
               onClick={() => setExpanded(true)}
-              className="gap-1"
+              className="h-8 gap-1 text-xs"
             >
               <Maximize2 className="h-3.5 w-3.5" /> Expand
             </Button>
@@ -289,7 +457,7 @@ function EngineEditor({
               size="sm"
               onClick={saveNow}
               disabled={value === lastSaved.current || save.isPending}
-              className="gap-1"
+              className="h-8 gap-1.5 text-xs font-semibold"
             >
               <Save className="h-3.5 w-3.5" /> Save
             </Button>
@@ -302,33 +470,33 @@ function EngineEditor({
           onChange={(e) => scheduleSave(e.target.value)}
           placeholder={engine.placeholder}
           spellCheck={false}
-          className="min-h-[260px] resize-y font-mono text-sm leading-relaxed"
+          className="min-h-[220px] resize-y bg-background font-mono text-xs leading-relaxed"
         />
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <div className="flex items-center justify-between text-[11px] text-muted-foreground">
           <span>Storage: strategy_os.{engine.key}</span>
-          <span>{value.length.toLocaleString()} chars</span>
+          <span className="font-mono">{value.length.toLocaleString()} chars</span>
         </div>
       </CardContent>
 
-      {/* Fullscreen editor */}
+      {/* Fullscreen expanded dialog */}
       <Dialog open={expanded} onOpenChange={setExpanded}>
         <DialogContent className="max-w-5xl">
           <DialogHeader>
-            <DialogTitle>{engine.title}</DialogTitle>
+            <DialogTitle className="text-lg font-bold">{engine.title}</DialogTitle>
           </DialogHeader>
           <Textarea
             value={value}
             onChange={(e) => scheduleSave(e.target.value)}
             placeholder={engine.placeholder}
             spellCheck={false}
-            className="min-h-[70vh] resize-none font-mono text-sm leading-relaxed"
+            className="min-h-[65vh] resize-none font-mono text-xs leading-relaxed"
             autoFocus
           />
           <div className="flex items-center justify-between text-xs text-muted-foreground">
-            <span>{value.length.toLocaleString()} chars</span>
+            <span className="font-mono">{value.length.toLocaleString()} chars</span>
             <div className="flex items-center gap-2">
               <StatusPill status={status} />
-              <Button size="sm" onClick={saveNow} className="gap-1">
+              <Button size="sm" onClick={saveNow} className="gap-1.5 font-semibold">
                 <Save className="h-3.5 w-3.5" /> Save now
               </Button>
             </div>
@@ -336,6 +504,7 @@ function EngineEditor({
         </DialogContent>
       </Dialog>
 
+      {/* History modal */}
       <HistoryDialog
         open={historyOpen}
         onOpenChange={setHistoryOpen}
@@ -345,7 +514,7 @@ function EngineEditor({
         onRestore={(content) => {
           scheduleSave(content);
           setHistoryOpen(false);
-          toast.success("Restored prior version — remember to save if autosave is off.");
+          toast.success("Restored prior version");
         }}
       />
     </Card>
@@ -387,7 +556,7 @@ function HistoryDialog({
 }) {
   const q = useQuery({
     queryKey: ["strategy-os-history", strategyOsId, engineKey],
-    enabled: open,
+    enabled: open && strategyOsId !== "local-os" && strategyOsId !== "loading-os",
     queryFn: async () => {
       const { data, error } = await supabase
         .from("strategy_os_versions")
@@ -413,8 +582,10 @@ function HistoryDialog({
               <Loader2 className="h-4 w-4 animate-spin" /> Loading history…
             </div>
           )}
-          {q.data && q.data.length === 0 && (
-            <p className="text-sm text-muted-foreground">No versions yet.</p>
+          {(!q.data || q.data.length === 0) && (
+            <p className="text-sm text-muted-foreground py-4 text-center">
+              No previous versions saved yet. Versions are logged automatically whenever you save a prompt.
+            </p>
           )}
           <ul className="space-y-3">
             {(q.data ?? []).map((v) => (
@@ -433,8 +604,7 @@ function HistoryDialog({
                   </Button>
                 </div>
                 <pre className="max-h-40 overflow-auto whitespace-pre-wrap break-words font-mono text-xs text-foreground/90">
-                  {(v.new_content ?? "").slice(0, 2000) ||
-                    "(empty)"}
+                  {(v.new_content ?? "").slice(0, 2000) || "(empty)"}
                   {v.new_content && v.new_content.length > 2000 ? "\n…" : ""}
                 </pre>
               </li>
