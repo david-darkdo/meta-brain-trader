@@ -184,10 +184,13 @@ function TradeDetail() {
 
   const runFn = async (fn: "orchestrate-pipeline" | "post-trade-pipeline") => {
     const { data: { session } } = await supabase.auth.getSession();
-    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/${fn}`;
+    const rawUrl = import.meta.env.VITE_SUPABASE_URL || "https://jqptprskuxkhfoxsvwcl.supabase.co";
+    const supabaseUrl = rawUrl.includes("qlfauxgzlooqebtpmcte") ? "https://jqptprskuxkhfoxsvwcl.supabase.co" : rawUrl;
+    const apikey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxcHRwcnNrdXhraGZveHN2d2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMzQzOTAsImV4cCI6MjEwMTcxMDM5MH0.uSSUrrH3xWSoqcOcc88LBePB5SGNL_fARHZzAj94cvM") as string;
+    const url = `${supabaseUrl}/functions/v1/${fn}`;
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
-      apikey: import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string,
+      apikey,
     };
     if (session?.access_token) {
       headers["Authorization"] = `Bearer ${session.access_token}`;

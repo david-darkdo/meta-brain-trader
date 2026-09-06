@@ -27,20 +27,19 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 
+const TARGET_SUPABASE_URL = "https://jqptprskuxkhfoxsvwcl.supabase.co";
+const TARGET_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxcHRwcnNrdXhraGZveHN2d2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMzQzOTAsImV4cCI6MjEwMTcxMDM5MH0.uSSUrrH3xWSoqcOcc88LBePB5SGNL_fARHZzAj94cvM";
+
 function createSupabaseClient() {
   // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering)
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+  // Fall back to process.env for SSR (server-side rendering) or target constants
+  let SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || TARGET_SUPABASE_URL;
+  let SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || TARGET_SUPABASE_KEY;
 
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-    const missing = [
-      ...(!SUPABASE_URL ? ['SUPABASE_URL'] : []),
-      ...(!SUPABASE_PUBLISHABLE_KEY ? ['SUPABASE_PUBLISHABLE_KEY'] : []),
-    ];
-    const message = `Missing Supabase environment variable(s): ${missing.join(', ')}. Connect Supabase in Lovable Cloud.`;
-    console.error(`[Supabase] ${message}`);
-    throw new Error(message);
+  // Ensure legacy or empty source project URLs are normalized to target backend
+  if (SUPABASE_URL.includes("qlfauxgzlooqebtpmcte") || !SUPABASE_URL) {
+    SUPABASE_URL = TARGET_SUPABASE_URL;
+    SUPABASE_PUBLISHABLE_KEY = TARGET_SUPABASE_KEY;
   }
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
