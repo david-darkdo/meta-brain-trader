@@ -20,7 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Sparkles, Brain, Lock, Trash2 } from "lucide-react";
+import { ArrowLeft, Sparkles, Brain, Lock, Trash2, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
 import { PipelineStatus } from "@/components/pipeline-status";
 import { PostPipelineStatus } from "@/components/post-pipeline-status";
@@ -341,27 +341,27 @@ function TradeDetail() {
               onCheckedChange={(v) => toggleExecuted.mutate(v)}
             />
           </div>
-          {editable && (
+          {tab === "post" ? (
             <Button
               size="sm"
-              className="gap-2"
-              onClick={() => startPre.mutate()}
-              disabled={startPre.isPending}
-            >
-              <Sparkles className="h-4 w-4" />
-              {startPre.isPending ? "Starting…" : "Run AI analysis"}
-            </Button>
-          )}
-          {canRunPost && (
-            <Button
-              size="sm"
-              variant="secondary"
-              className="gap-2"
+              variant="outline"
+              className="gap-2 border-primary/40 hover:bg-primary/10"
               onClick={() => startPost.mutate()}
-              disabled={startPost.isPending}
+              disabled={startPost.isPending || t.processing_step === "POST_PENDING" || (POST_STEPS.has(t.processing_step) && t.processing_step !== "POST_COMPLETED" && t.processing_step !== "POST_FAILED")}
             >
-              <Brain className="h-4 w-4" />
-              {startPost.isPending ? "Starting…" : "Run post-trade analysis"}
+              <RotateCcw className={`h-4 w-4 ${startPost.isPending ? "animate-spin" : ""}`} />
+              {startPost.isPending ? "Retrying…" : "Retry"}
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-2 border-primary/40 hover:bg-primary/10"
+              onClick={() => startPre.mutate()}
+              disabled={startPre.isPending || (PRE_STEPS.has(t.processing_step) && t.processing_step !== "COMPLETED" && t.processing_step !== "FAILED" && t.processing_step !== "PENDING" && t.trade_status === "PRE_ANALYSIS")}
+            >
+              <RotateCcw className={`h-4 w-4 ${startPre.isPending ? "animate-spin" : ""}`} />
+              {startPre.isPending ? "Retrying…" : "Retry"}
             </Button>
           )}
 
@@ -507,29 +507,7 @@ function TradeDetail() {
           <ResultForm tradeId={t.trade_id} existingResult={resultQ.data} />
           <PostScreenshotUploader tradeId={t.trade_id} />
 
-          {resultQ.data && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Post-trade analysis</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Run the post-trade AI pipeline to audit execution vs. strategy, log behavioral
-                  mistakes or strengths, and extract lessons.
-                </p>
-                {canRunPost && (
-                  <Button
-                    onClick={() => startPost.mutate()}
-                    disabled={startPost.isPending}
-                    className="gap-2"
-                  >
-                    <Brain className="h-4 w-4" />
-                    {startPost.isPending ? "Starting…" : "Run post-trade analysis"}
-                  </Button>
-                )}
-              </CardContent>
-            </Card>
-          )}
+
 
           {/* POST-TRADE DETAILED AUDIT PANEL */}
           <AiAnalysesPanel tradeId={t.trade_id} phase="POST" />
