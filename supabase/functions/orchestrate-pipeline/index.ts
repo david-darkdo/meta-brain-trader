@@ -109,6 +109,8 @@ async function runPipeline(tradeId: string) {
     });
 
     try {
+      // 350ms smoothing delay to prevent burst token rate limit spikes
+      await new Promise((r) => setTimeout(r, 350));
       const { output, provider, model } = await runStage(stage as StageName, ctx);
       priorAnalyses[stage] = output;
 
