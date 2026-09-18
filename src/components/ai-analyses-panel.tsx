@@ -88,7 +88,15 @@ export function AiAnalysesPanel({
     return true;
   });
 
-  if (filtered.length === 0) return null;
+  // Deduplicate and retain only the latest analysis per stage key
+  const stageMap = new Map<string, Analysis>();
+  for (const a of filtered) {
+    const stageKey = (a.ai_output?.stage as string) || a.stage;
+    stageMap.set(stageKey, a);
+  }
+  const uniqueStages = Array.from(stageMap.values());
+
+  if (uniqueStages.length === 0) return null;
 
   return (
     <div className="space-y-4">
@@ -101,11 +109,11 @@ export function AiAnalysesPanel({
               : "AI Intelligence Stages"}
         </h3>
         <span className="text-xs text-muted-foreground">
-          {filtered.length} stage{filtered.length > 1 ? "s" : ""} completed
+          {uniqueStages.length} stage{uniqueStages.length > 1 ? "s" : ""} completed
         </span>
       </div>
 
-      {filtered.map((a) => {
+      {uniqueStages.map((a) => {
         const stageKey = (a.ai_output?.stage as string) || a.stage;
         const title = STAGE_TITLES[stageKey] ?? stageKey;
         const out = a.ai_output || {};

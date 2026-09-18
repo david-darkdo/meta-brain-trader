@@ -161,6 +161,23 @@ async function runPipeline(tradeId: string) {
     COACH_REPORT: "POST_COACH",
   };
 
+  // Clean up prior post-trade analyses for this trade so fresh runs/retries start completely clean
+  const { data: existingAnalyses } = await admin
+    .from("ai_analyses")
+    .select("analysis_id,ai_output")
+    .eq("trade_id", tradeId);
+
+  const postAnalysisIdsToDelete = (existingAnalyses ?? [])
+    .filter((a) => {
+      const stage = ((a.ai_output as Record<string, unknown>)?.stage as string) || "";
+      return ["REVIEW", "MISTAKE", "PERFORMANCE", "LEARNING_UPDATE", "COACH_REPORT"].includes(stage);
+    })
+    .map((a) => a.analysis_id);
+
+  if (postAnalysisIdsToDelete.length > 0) {
+    await admin.from("ai_analyses").delete().in("analysis_id", postAnalysisIdsToDelete);
+  }
+
   for (const stage of POST_STAGE_SEQUENCE) {
     await admin
       .from("trades")

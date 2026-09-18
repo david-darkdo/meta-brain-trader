@@ -36,12 +36,18 @@ type PreTradeCockpitProps = {
 };
 
 export function PreTradeCockpit({ trade, analyses }: PreTradeCockpitProps) {
-  // Find key stages from pre-trade analyses
-  const verdictStage = analyses.find((a) => (a.ai_output?.stage || a.stage) === "VERDICT");
-  const strategyStage = analyses.find((a) => (a.ai_output?.stage || a.stage) === "STRATEGY");
-  const blindStage = analyses.find((a) => (a.ai_output?.stage || a.stage) === "BLIND");
-  const validationStage = analyses.find((a) => (a.ai_output?.stage || a.stage) === "VALIDATION");
-  const learningStage = analyses.find((a) => (a.ai_output?.stage || a.stage) === "LEARNING");
+  // Group and pick the latest analysis per stage key (newest wins)
+  const latestByStage: Record<string, AnalysisItem> = {};
+  for (const a of analyses) {
+    const stageKey = (a.ai_output?.stage as string) || a.stage;
+    latestByStage[stageKey] = a;
+  }
+
+  const verdictStage = latestByStage["VERDICT"];
+  const strategyStage = latestByStage["STRATEGY"];
+  const blindStage = latestByStage["BLIND"];
+  const validationStage = latestByStage["VALIDATION"];
+  const learningStage = latestByStage["LEARNING"];
 
   if (!verdictStage && analyses.length === 0) {
     return null;

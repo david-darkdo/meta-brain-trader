@@ -88,6 +88,23 @@ async function runPipeline(tradeId: string) {
     recentTrades: recent ?? [],
   };
 
+  // Clean up prior pre-trade analyses for this trade so fresh runs/retries start completely clean
+  const { data: existingAnalyses } = await admin
+    .from("ai_analyses")
+    .select("analysis_id,ai_output")
+    .eq("trade_id", tradeId);
+
+  const preAnalysisIdsToDelete = (existingAnalyses ?? [])
+    .filter((a) => {
+      const stage = ((a.ai_output as Record<string, unknown>)?.stage as string) || "";
+      return !["REVIEW", "MISTAKE", "PERFORMANCE", "LEARNING_UPDATE", "COACH_REPORT"].includes(stage);
+    })
+    .map((a) => a.analysis_id);
+
+  if (preAnalysisIdsToDelete.length > 0) {
+    await admin.from("ai_analyses").delete().in("analysis_id", preAnalysisIdsToDelete);
+  }
+
   for (const stage of STAGE_SEQUENCE) {
     await admin
       .from("trades")

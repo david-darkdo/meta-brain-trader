@@ -47,10 +47,17 @@ type PostTradeCockpitProps = {
 };
 
 export function PostTradeCockpit({ trade, result, analyses }: PostTradeCockpitProps) {
-  const coachReport = analyses.find((a) => (a.ai_output?.stage || a.stage) === "COACH_REPORT");
-  const reviewStage = analyses.find((a) => (a.ai_output?.stage || a.stage) === "REVIEW");
-  const mistakeStage = analyses.find((a) => (a.ai_output?.stage || a.stage) === "MISTAKE");
-  const perfStage = analyses.find((a) => (a.ai_output?.stage || a.stage) === "PERFORMANCE");
+  // Group and pick latest analysis per post-stage key (newest wins)
+  const latestByStage: Record<string, AnalysisItem> = {};
+  for (const a of analyses) {
+    const stageKey = (a.ai_output?.stage as string) || a.stage;
+    latestByStage[stageKey] = a;
+  }
+
+  const coachReport = latestByStage["COACH_REPORT"];
+  const reviewStage = latestByStage["REVIEW"];
+  const mistakeStage = latestByStage["MISTAKE"];
+  const perfStage = latestByStage["PERFORMANCE"];
 
   if (!coachReport && !reviewStage && !result) {
     return null;

@@ -20,7 +20,24 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Sparkles, Brain, Lock, Trash2, RotateCcw } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { ArrowLeft, Sparkles, Brain, Lock, Trash2, RotateCcw, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { PipelineStatus } from "@/components/pipeline-status";
 import { PostPipelineStatus } from "@/components/post-pipeline-status";
@@ -168,7 +185,7 @@ function TradeDetail() {
       .channel(`trade-${id}-analyses-realtime`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "ai_analyses", filter: `trade_id=eq.${id}` },
+        { event: "*", schema: "public", table: "ai_analyses", filter: `trade_id=eq.${id}` },
         () => {
           qc.invalidateQueries({ queryKey: ["trade", id, "analyses"] });
           qc.invalidateQueries({ queryKey: ["trade", id, "verdict"] });
@@ -241,6 +258,69 @@ function TradeDetail() {
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["trade", id] }),
+  });
+
+  const [editOpen, setEditOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    pair: "",
+    direction: "LONG",
+    entry_price: "",
+    stop_loss: "",
+    take_profit: "",
+    account_size: "",
+    risk_pct: "",
+    session: "London",
+    notes: "",
+  });
+
+  useEffect(() => {
+    if (tradeQ.data) {
+      const td = tradeQ.data;
+      setEditForm({
+        pair: td.pair || "",
+        direction: td.direction || "LONG",
+        entry_price: td.entry_price != null ? String(td.entry_price) : "",
+        stop_loss: td.stop_loss != null ? String(td.stop_loss) : "",
+        take_profit: td.take_profit != null ? String(td.take_profit) : "",
+        account_size: td.account_size != null ? String(td.account_size) : "",
+        risk_pct: td.risk_pct != null ? String(td.risk_pct) : "",
+        session: td.session || "London",
+        notes: td.notes || "",
+      });
+    }
+  }, [tradeQ.data]);
+
+  const updateTradeMut = useMutation({
+    mutationFn: async ({ rerunAi }: { rerunAi: boolean }) => {
+      const payload: Record<string, any> = {
+        pair: editForm.pair.trim().toUpperCase(),
+        direction: editForm.direction,
+        entry_price: editForm.entry_price ? parseFloat(editForm.entry_price) : null,
+        stop_loss: editForm.stop_loss ? parseFloat(editForm.stop_loss) : null,
+        take_profit: editForm.take_profit ? parseFloat(editForm.take_profit) : null,
+        account_size: editForm.account_size ? parseFloat(editForm.account_size) : null,
+        risk_pct: editForm.risk_pct ? parseFloat(editForm.risk_pct) : null,
+        session: editForm.session,
+        notes: editForm.notes.trim() || null,
+      };
+      const { error } = await supabase
+        .from("trades")
+        .update(payload)
+        .eq("trade_id", id);
+      if (error) throw error;
+      return rerunAi;
+    },
+    onSuccess: (rerunAi) => {
+      qc.invalidateQueries({ queryKey: ["trade", id] });
+      setEditOpen(false);
+      toast.success("Trade plan updated successfully");
+      if (rerunAi) {
+        startPre.mutate();
+      }
+    },
+    onError: (e: any) => {
+      toast.error(e?.message || "Failed to update trade");
+    },
   });
 
   const deleteMut = useMutation({
@@ -364,6 +444,169 @@ function TradeDetail() {
               {startPre.isPending ? "Retrying…" : "Retry"}
             </Button>
           )}
+
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5"
+            onClick={() => setEditOpen(true)}
+          >
+            <Pencil className="h-4 w-4" /> Edit Trade
+          </Button>
+
+          <Dialog open={editOpen} onOpenChange={setEditOpen}>
+            <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Edit Trade Plan ({t.pair})</DialogTitle>
+                <DialogDescription>
+                  Modify trade parameters, direction, or risk settings. You can save changes or re-run the full AI analysis pipeline.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-4 py-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-pair">Pair / Ticker</Label>
+                    <Input
+                      id="edit-pair"
+                      value={editForm.pair}
+                      onChange={(e) => setEditForm({ ...editForm, pair: e.target.value.toUpperCase() })}
+                      placeholder="e.g. EURUSD"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-direction">Direction</Label>
+                    <Select
+                      value={editForm.direction}
+                      onValueChange={(v) => setEditForm({ ...editForm, direction: v })}
+                    >
+                      <SelectTrigger id="edit-direction">
+                        <SelectValue placeholder="Select direction" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="LONG">LONG (Buy)</SelectItem>
+                        <SelectItem value="SHORT">SHORT (Sell)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-entry">Entry Price</Label>
+                    <Input
+                      id="edit-entry"
+                      type="number"
+                      step="any"
+                      value={editForm.entry_price}
+                      onChange={(e) => setEditForm({ ...editForm, entry_price: e.target.value })}
+                      placeholder="1.0850"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-sl">Stop Loss</Label>
+                    <Input
+                      id="edit-sl"
+                      type="number"
+                      step="any"
+                      value={editForm.stop_loss}
+                      onChange={(e) => setEditForm({ ...editForm, stop_loss: e.target.value })}
+                      placeholder="1.0820"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-tp">Take Profit</Label>
+                    <Input
+                      id="edit-tp"
+                      type="number"
+                      step="any"
+                      value={editForm.take_profit}
+                      onChange={(e) => setEditForm({ ...editForm, take_profit: e.target.value })}
+                      placeholder="1.0950"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-account">Account Size ($)</Label>
+                    <Input
+                      id="edit-account"
+                      type="number"
+                      step="any"
+                      value={editForm.account_size}
+                      onChange={(e) => setEditForm({ ...editForm, account_size: e.target.value })}
+                      placeholder="10000"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-risk">Risk %</Label>
+                    <Input
+                      id="edit-risk"
+                      type="number"
+                      step="any"
+                      value={editForm.risk_pct}
+                      onChange={(e) => setEditForm({ ...editForm, risk_pct: e.target.value })}
+                      placeholder="1"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="edit-session">Session</Label>
+                    <Select
+                      value={editForm.session}
+                      onValueChange={(v) => setEditForm({ ...editForm, session: v })}
+                    >
+                      <SelectTrigger id="edit-session">
+                        <SelectValue placeholder="Session" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="London">London</SelectItem>
+                        <SelectItem value="New York">New York</SelectItem>
+                        <SelectItem value="Asian">Asian</SelectItem>
+                        <SelectItem value="Pre-Market">Pre-Market</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="edit-notes">Trade Thesis / Notes</Label>
+                  <Textarea
+                    id="edit-notes"
+                    rows={3}
+                    value={editForm.notes}
+                    onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })}
+                    placeholder="Describe market structure, order blocks, confluence reasons..."
+                  />
+                </div>
+              </div>
+
+              <DialogFooter className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setEditOpen(false)}
+                  disabled={updateTradeMut.isPending}
+                >
+                  Cancel
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => updateTradeMut.mutate({ rerunAi: false })}
+                  disabled={updateTradeMut.isPending}
+                >
+                  {updateTradeMut.isPending ? "Saving…" : "Save Changes"}
+                </Button>
+                <Button
+                  className="gap-2"
+                  onClick={() => updateTradeMut.mutate({ rerunAi: true })}
+                  disabled={updateTradeMut.isPending}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  {updateTradeMut.isPending ? "Saving…" : "Save & Re-run AI"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <AlertDialog>
             <AlertDialogTrigger asChild>
