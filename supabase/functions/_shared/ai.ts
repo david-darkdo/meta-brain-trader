@@ -79,7 +79,7 @@ export async function callAI<T = unknown>(
   };
 
   let lastError: Error | null = null;
-  const maxRetries = 5;
+  const maxRetries = 7;
 
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
@@ -91,28 +91,35 @@ export async function callAI<T = unknown>(
 
       if (!res.ok) {
         const text = await res.text();
-        
-        // Handle 429 Rate Limit with backoff & retry
-        if (res.status === 429 && attempt < maxRetries - 1) {
-          let waitMs = 1000 * Math.pow(1.5, attempt) + Math.random() * 500;
-          
-          // Try to parse delay from OpenAI error message e.g. "Please try again in 372ms."
-          const matchMs = text.match(/try again in ([0-9.]+)ms/i);
-          const matchS = text.match(/try again in ([0-9.]+)s/i);
-          if (matchMs && matchMs[1]) {
-            waitMs = Math.max(parseFloat(matchMs[1]) + 200, waitMs);
-          } else if (matchS && matchS[1]) {
-            waitMs = Math.max(parseFloat(matchS[1]) * 1000 + 200, waitMs);
-          }
 
-          console.warn(`[callAI] Rate limit 429 received. Retrying attempt ${attempt + 1}/${maxRetries} after ${Math.round(waitMs)}ms...`);
-          await new Promise((resolve) => setTimeout(resolve, waitMs));
-          continue;
+        // Handle 429 Rate Limit with progressive backoff & parsed OpenAI reset time
+        if (res.status === 429) {
+          if (attempt < maxRetries - 1) {
+            let waitMs = Math.min(1000 * Math.pow(1.6, attempt), 6000) + Math.random() * 500;
+
+            // Try to parse delay from OpenAI error message e.g. "Please try again in 372ms."
+            const matchMs = text.match(/try again in ([0-9.]+)ms/i);
+            const matchS = text.match(/try again in ([0-9.]+)s/i);
+            if (matchMs && matchMs[1]) {
+              waitMs = Math.max(parseFloat(matchMs[1]) + 800, waitMs);
+            } else if (matchS && matchS[1]) {
+              waitMs = Math.max(parseFloat(matchS[1]) * 1000 + 800, waitMs);
+            }
+
+            // On later retries if still throttled, add extra patience
+            if (attempt >= 3) {
+              waitMs = Math.max(waitMs, 3000 + Math.random() * 1000);
+            }
+
+            console.warn(`[callAI] Rate limit 429 on ${model} (attempt ${attempt + 1}/${maxRetries}). Waiting ${Math.round(waitMs)}ms before retry...`);
+            await new Promise((resolve) => setTimeout(resolve, waitMs));
+            continue;
+          }
         }
 
         // Handle 5xx temporary server errors with backoff
         if (res.status >= 500 && attempt < maxRetries - 1) {
-          const waitMs = 1000 * Math.pow(2, attempt) + Math.random() * 500;
+          const waitMs = 1200 * Math.pow(1.8, attempt) + Math.random() * 500;
           console.warn(`[callAI] Server error ${res.status}. Retrying attempt ${attempt + 1}/${maxRetries} after ${Math.round(waitMs)}ms...`);
           await new Promise((resolve) => setTimeout(resolve, waitMs));
           continue;
@@ -138,9 +145,14 @@ export async function callAI<T = unknown>(
       return { output: parsed, provider, model };
     } catch (err: any) {
       lastError = err instanceof Error ? err : new Error(String(err));
-      if (attempt === maxRetries - 1 || !lastError.message.includes("429")) {
+      const is429 = lastError.message.includes("429") || lastError.message.includes("rate_limit");
+      if (attempt === maxRetries - 1 || !is429) {
         throw lastError;
       }
+      // If caught an error containing 429 before maxRetries, backoff and loop
+      const waitMs = Math.min(1200 * Math.pow(1.6, attempt), 6000) + Math.random() * 500;
+      console.warn(`[callAI] Caught 429 error. Waiting ${Math.round(waitMs)}ms for attempt ${attempt + 2}...`);
+      await new Promise((resolve) => setTimeout(resolve, waitMs));
     }
   }
 
