@@ -1,255 +1,117 @@
 # MetaBrain Trader
 
-> **AI-assisted trading intelligence, validation, journaling, and investor-performance infrastructure.**
+> **An intelligent trading and investor-performance platform built around validated decisions, auditable results, and disciplined capital management.**
 
-MetaBrain Trader is being built as a unified trading platform around one core principle:
+MetaBrain Trader is being built as a focused system first — not as a collection of disconnected features.
 
-**Protect capital. Improve decision quality. Preserve an auditable record of every trading decision and result.**
+The immediate objective is simple:
 
-The product is intentionally being built in stages. The current priority is not to build every long-term integration at once. The priority is to make the existing Trade Validator reliable, connect it to a controlled internal investor-performance system (MetaFund), establish the Community and Profile foundations, and keep the architecture ready for future broker and payment integrations.
+**Make the Trade Validator reliable, connect it to a controlled MetaFund investor-performance system, establish the Community and Profile foundations, and keep the architecture ready for future execution and financial integrations.**
 
----
+The guiding principle is:
 
-## Product Vision
-
-MetaBrain Trader is intended to become a unified platform with four connected product domains:
-
-1. **Trade Validator** — the trading intelligence and validation engine.
-2. **MetaFund** — the investor-performance and internal accounting layer for authorized friends and family.
-3. **Community** — the social layer that makes the platform active and allows controlled sharing of trading knowledge and results.
-4. **Profile / Settings** — identity, account, preferences, security, and future connected services.
-
-The long-term platform can expand into:
-
-**Trade Intelligence → Execution Infrastructure → Broker/MT5 Integrations → MetaFund → Investor Accounting → Community → Analytics → Subscriptions → External Financial Infrastructure**
-
-The current product is deliberately smaller than that long-term vision.
+> **Fast, but correct.**
 
 ---
 
-# Current Product Direction
+## Vision
 
-## The immediate target
+MetaBrain Trader is intended to grow into a unified trading technology platform connecting:
 
-The first complete MetaBrain Trader version is:
+**Trade Intelligence → Validation → Execution Infrastructure → Investor Capital → Performance & Accounting → Community → Analytics → External Integrations**
 
-**Trade Validator + MetaFund + Community foundation + Profile/Settings**
+The long-term vision is larger than the current product.
 
-The most important new connection is:
-
-**Trade Validator → MetaFund**
-
-The system should use the existing canonical trading lifecycle rather than creating a second, conflicting trading system.
-
-External payment and broker integrations are **future architecture**, not blockers for the current build.
+The current product is deliberately smaller so that each core domain can be made reliable before the system expands.
 
 ---
 
-# Current State
+# Current Product
 
-The repository has evolved significantly beyond the original foundation-only README.
+The current target is:
 
-The current application already contains substantial Trade Validator functionality, including areas such as:
+1. **Trade Validator**
+2. **MetaFund**
+3. **Community**
+4. **Profile / Settings**
+
+These are the core product domains for the current stage.
+
+### 1. Trade Validator
+
+The Trade Validator is the existing trading intelligence core.
+
+It is responsible for the canonical trading lifecycle, including the areas already implemented in the application:
 
 - trade creation and editing
-- trade lifecycle/state handling
+- multi-step trade workflow
+- screenshots
 - pre-trade analysis
 - post-trade analysis
-- AI analysis records
-- screenshots
+- AI analysis
 - execution state
 - trade results
 - reflections
 - learning insights
 - dashboard metrics
-- retryable processing pipelines
+- processing/retry flows
 - journal functionality
-- authenticated application routes
-- Supabase-backed persistence
-- private screenshot storage
-- account/authentication infrastructure
 
-The current application is built with:
+The Trade Validator remains the **source of truth for trading records and trading results**.
 
-- React
-- TanStack Start / TanStack Router
-- TypeScript
-- Supabase
-- PostgreSQL
-- Supabase Auth
-- Supabase Storage
-- React Query
-- Vercel
-- GitHub
+We do not create a second trading system for MetaFund.
 
-The production application is deployed through Vercel and the GitHub repository is the source repository for the application.
+### 2. MetaFund
 
----
+MetaFund is the investor-facing performance and internal accounting layer for authorized investors.
 
-# Architecture Principle
+The first version is intentionally internal and controlled.
 
-## One source of truth
+It should provide:
 
-Trade Validator remains the authoritative trading-analysis domain.
+- investor accounts
+- investor activation
+- capital events
+- activation timestamps
+- trade eligibility
+- deterministic allocation
+- investor P&L
+- performance history
+- accounting ledger
+- investment periods/cycles
+- withdrawal states
+- controlled adjustments
+- audit history
+- investor dashboard
+- administrative controls
 
-MetaFund must consume the appropriate verified trade and result information from that existing lifecycle.
-
-MetaFund must **not** create a second independent trading system simply to display investor performance.
-
-The intended relationship is:
+The central relationship is:
 
 ```
 Trade Validator
       ↓
-Canonical Trade Record
+Canonical Trade
       ↓
-Execution / Result State
+Verified Trade Result
       ↓
-MetaFund Allocation
+MetaFund Eligibility
+      ↓
+Deterministic Allocation
       ↓
 Investor Ledger
       ↓
 Investor Performance
       ↓
-MetaFund Dashboard
+Investor Dashboard
 ```
 
-This prevents duplicate trades, conflicting results, duplicated P&L, and inconsistent histories.
+MetaFund must consume the existing canonical trade lifecycle rather than duplicate it.
 
----
+### 3. Community
 
-# MetaFund
+Community provides the social layer that makes MetaBrain Trader feel alive.
 
-MetaFund is the internal investor-performance platform for authorized friends and family.
-
-The immediate version does **not** require:
-
-- Stripe
-- Kora
-- another payment gateway
-- MT5 API
-- broker API
-- automated broker execution
-- automated payment settlement
-- automated withdrawals
-- external KYC infrastructure
-
-Those systems may be integrated later.
-
-The first MetaFund version should work using the trading records and results already generated inside MetaBrain Trader.
-
-## MetaFund goals
-
-MetaFund should eventually support:
-
-- investor accounts
-- investor activation
-- capital records
-- capital activation timestamps
-- trade eligibility
-- deterministic trade allocation
-- investor P&L
-- investor performance
-- investor ledger
-- investment periods/cycles
-- withdrawal states
-- controlled adjustments
-- audit history
-- administrator controls
-- investor-specific dashboards
-
-Financial records must be auditable.
-
-Balances should not simply be overwritten to make numbers appear correct. Corrections should be represented through controlled accounting events.
-
----
-
-# Trade Eligibility
-
-An investor should not receive historical performance merely because an account was created later.
-
-The intended rule is:
-
-> **Investor participation begins from the point their capital is activated.**
-
-Therefore, MetaFund must preserve the distinction between:
-
-- historical trades
-- investor activation
-- eligible trades
-- allocated results
-
-This logic must be enforced on the backend, not only through frontend filtering.
-
----
-
-# Allocation Engine
-
-Investor allocation must be deterministic.
-
-The system should:
-
-1. identify the canonical Trade Validator trade;
-2. determine whether the trade qualifies for MetaFund;
-3. identify eligible investors;
-4. determine the applicable investor capital;
-5. obtain the authoritative trade result;
-6. calculate the applicable investor result;
-7. create the appropriate accounting/ledger event;
-8. update the investor performance projection.
-
-AI should not arbitrarily determine financial allocation.
-
----
-
-# Investor Ledger
-
-MetaFund requires an authoritative accounting ledger capable of representing events such as:
-
-- capital activation
-- additional capital
-- trade allocation
-- investor profit
-- investor loss
-- withdrawal
-- adjustment
-- reversal/correction
-- related trade
-- timestamps
-- audit information
-
-Financial operations must be idempotent.
-
-A retry, duplicate event, refresh, or repeated backend invocation must not create duplicate investor P&L.
-
----
-
-# Administrative Controls
-
-MetaFund will require an administrative control surface for authorized operators.
-
-It should eventually support:
-
-- investor management
-- capital activation
-- investment status
-- performance review
-- allocation review
-- ledger review
-- controlled financial adjustments
-- withdrawal state management
-- configuration
-- audit history
-
-There must not be an unrestricted frontend mechanism for simply editing investor balances.
-
----
-
-# Community
-
-Community is a product domain, not a replacement for the trading system.
-
-The initial objective is to establish the foundation and make the application feel alive without immediately rebuilding Discord.
+The first version should establish the foundation without attempting to rebuild Discord.
 
 Future capabilities may include:
 
@@ -260,193 +122,313 @@ Future capabilities may include:
 - profiles
 - following
 - discovery
-- controlled sharing of trade results
+- controlled sharing of trading activity
 
-Where trade information is shared, it should reference authorized/canonical trading records rather than create duplicate trade entities.
+Community features should reference canonical trading records where appropriate rather than creating duplicate trade entities.
 
----
-
-# Profile / Settings
+### 4. Profile / Settings
 
 Profile and Settings provide the account-level foundation for:
 
 - profile information
-- security
 - preferences
+- security
 - notifications
-- timezone
 - privacy
-- subscriptions
+- timezone
+- future subscriptions
 - future connected services
 
-The existing implementation should be inspected and extended rather than unnecessarily replaced.
+Existing functionality should be extended where possible rather than unnecessarily replaced.
+
+---
+
+# What Is Already Here
+
+The repository is no longer the original foundation-only Trade Journal project.
+
+The current application contains a substantial Trade Validator implementation backed by Supabase and deployed through Vercel.
+
+The codebase currently uses:
+
+- React
+- TypeScript
+- TanStack Start
+- TanStack Router
+- Supabase
+- PostgreSQL
+- Supabase Auth
+- Supabase Storage
+- React Query
+- Vite
+- Tailwind
+- Vercel
+- GitHub
+
+The production application and actual repository are the source of truth.
+
+The README is documentation — it must never be treated as proof that a feature exists.
+
+---
+
+# What We Are Building Next
+
+## Immediate next objective: MetaBrain Trader Reality Audit
+
+Before implementing MetaFund, the real system must be mapped.
+
+The audit must establish:
+
+1. the exact current Trade Validator workflow;
+2. the actual database schema;
+3. canonical trade and result records;
+4. existing Supabase functions;
+5. existing triggers;
+6. existing RLS policies;
+7. existing storage/security rules;
+8. the AI processing pipeline;
+9. execution and result states;
+10. current dashboard/read models;
+11. reusable backend logic;
+12. architectural conflicts;
+13. MetaFund entities that already exist;
+14. MetaFund entities that are actually missing;
+15. required migrations;
+16. the exact Trade Validator → MetaFund workflow.
+
+The output becomes the:
+
+**MetaFund Implementation Architecture Specification.**
+
+No major MetaFund implementation should begin until this reality audit is reconciled with the actual codebase.
+
+---
+
+# MetaFund Rules
+
+MetaFund is a financial/accounting domain, so correctness matters more than UI convenience.
+
+## Investor activation
+
+Investor participation begins from the moment capital is activated.
+
+Historical trades must not be retroactively attributed to an investor simply because the investor account was created later.
+
+The system must preserve:
+
+- historical trades
+- activation timestamp
+- eligible trades
+- allocated results
+
+as distinct concepts.
+
+## Additional capital
+
+Additional capital is a separate capital event with its own activation timestamp.
+
+It must not silently rewrite the original capital event.
+
+## Deterministic allocation
+
+Financial allocation must be deterministic.
+
+The system should:
+
+1. identify the canonical trade;
+2. determine whether it is eligible;
+3. identify eligible investors;
+4. determine applicable capital;
+5. obtain the authoritative trade result;
+6. calculate the investor result using configured rules;
+7. create the accounting event;
+8. update the investor performance projection.
+
+AI must not arbitrarily decide financial allocations.
+
+## Ledger integrity
+
+Investor accounting must be represented through auditable events.
+
+Examples include:
+
+- capital activation
+- additional capital
+- trade allocation
+- investor profit
+- investor loss
+- withdrawal
+- adjustment
+- reversal/correction
+
+Balances should not be freely overwritten from the frontend.
+
+Corrections should be represented as controlled accounting events.
+
+Financial processing must be **idempotent** so retries or duplicate backend invocations cannot create duplicate P&L.
 
 ---
 
 # Security
 
-Security is a core architectural requirement.
+Security is part of the architecture, not a later feature.
 
-The platform must preserve:
+The system must preserve:
 
-- authentication
+- authenticated access
 - authorization
 - Supabase Row Level Security
 - investor isolation
-- private financial information
-- private trade screenshots
+- private financial records
+- private screenshots
 - server-side validation
-- controlled administrative actions
+- protected administrative actions
 - auditability
-- protection against frontend manipulation
 - idempotent financial operations
+- protection against frontend manipulation
 
-No investor should be able to access another investor's financial records.
+An investor must never be able to access another investor's financial records.
+
+---
+
+# Architecture Principle
+
+## One source of truth
+
+The existing Trade Validator remains authoritative for trading information.
+
+MetaFund owns investor capital, allocation, performance, and accounting.
+
+Community owns social interaction.
+
+Profile / Settings owns account-level preferences and identity.
+
+Each domain should have a clear boundary.
+
+The system should not duplicate data merely because another page needs to display it.
 
 ---
 
 # Development Philosophy
 
-MetaBrain Trader is being built under one rule:
-
-> **Fast, but correct.**
-
-Speed matters, but speed must not create an architecture that has to be thrown away later.
-
-The target is:
+MetaBrain Trader is being built according to:
 
 > **Build the smallest complete architecture that can grow into the larger MetaBrain Trader system without requiring a fundamental rewrite.**
 
-This means:
+That means:
 
-- do not build unnecessary future infrastructure now;
-- do not create disposable shortcuts;
-- do not duplicate existing domains;
-- do not invent integrations that are not connected;
+- do not build unnecessary integrations early;
+- do not create disposable architecture;
+- do not duplicate canonical domains;
 - do not fake production functionality;
-- do not sacrifice security for UI speed;
-- do not modify working Trade Validator functionality without understanding its dependencies.
+- do not sacrifice security for speed;
+- do not modify working Trade Validator logic without understanding its dependencies;
+- do not hard-code financial rules in scattered frontend components;
+- do not allow frontend state to become the source of truth for financial records.
+
+The objective is not to build everything immediately.
+
+The objective is to build the **right foundation**.
 
 ---
 
 # Development Workflow
 
-Every major phase should follow:
+Every major change follows:
 
 **AUDIT → ARCHITECTURE → IMPLEMENT → TEST → VERIFY → DEPLOY → AUDIT AGAIN**
 
-The actual repository and production environment are the source of truth.
+### Audit
+Inspect the actual repository, database-facing code, production behavior, and security boundaries.
 
-Documentation and previous prompts describe intended direction, but they must never be treated as proof that a feature exists.
+### Architecture
+Define the smallest correct change and how it connects to existing domains.
 
-Before modifying an existing subsystem:
+### Implement
+Make the change without unnecessarily disturbing working systems.
 
-1. inspect the current implementation;
-2. identify its dependencies;
-3. identify its authoritative data;
-4. identify security boundaries;
-5. identify what can be reused;
-6. define the change;
-7. implement the smallest safe change;
-8. test it;
-9. verify production.
+### Test
+Test the feature and its failure paths.
 
----
+### Verify
+Inspect the actual result in the application and backend.
 
-# Immediate Next Work
+### Deploy
+Deploy through the production pipeline.
 
-The next task is the **MetaBrain Trader Reality Audit**.
-
-Before implementing MetaFund, the architecture must be mapped against the actual codebase.
-
-The audit must determine:
-
-1. what the current Trade Validator actually does;
-2. the current database schema;
-3. the canonical trade lifecycle;
-4. the canonical result lifecycle;
-5. existing Supabase functions;
-6. existing triggers;
-7. existing RLS policies;
-8. existing storage/security policies;
-9. existing AI pipeline;
-10. existing execution state;
-11. existing dashboard/read models;
-12. what MetaFund entities already exist, if any;
-13. what new MetaFund entities are actually required;
-14. what existing architecture must not be disturbed;
-15. what migrations are required;
-16. the exact Trade Validator → MetaFund backend workflow.
-
-The output of this audit will become the:
-
-**MetaFund Implementation Architecture Specification**
-
-Only after the architecture has been reconciled with the real codebase should implementation begin.
+### Audit Again
+Verify that production still matches the intended architecture.
 
 ---
 
 # Planned Build Sequence
 
 ## Phase 1 — Reality Audit
+Map the existing Trade Validator, database, backend logic, security, and production behavior.
 
-Inspect the actual repository, database-facing code, functions, security, and production behavior.
+## Phase 2 — MetaFund Architecture
+Define MetaFund entities, lifecycle, allocation rules, ledger model, and security boundaries.
 
-## Phase 2 — MetaFund Domain Architecture
+## Phase 3 — MetaFund Database Layer
+Implement only the required new data model and backend logic.
 
-Define entities, relationships, lifecycle states, ledger events, allocation rules, constraints, and security boundaries.
+## Phase 4 — Investor Activation
+Implement investor identity, capital events, activation, and eligibility.
 
-## Phase 3 — Database Layer
-
-Implement the required MetaFund schema and backend logic without duplicating canonical Trade Validator data.
-
-## Phase 4 — Investor Accounts
-
-Implement investor identity, activation, capital events, eligibility, and account state.
-
-## Phase 5 — Trade → MetaFund Connection
-
-Connect qualifying Trade Validator events to MetaFund through deterministic, idempotent backend processing.
+## Phase 5 — Trade → MetaFund Pipeline
+Connect qualifying Trade Validator results to MetaFund through deterministic, idempotent processing.
 
 ## Phase 6 — Allocation & Ledger
-
-Implement investor allocation, accounting events, reconciliation, and performance projections.
+Implement allocation, investor P&L, accounting events, reconciliation, and auditability.
 
 ## Phase 7 — Investor Dashboard
-
-Build the investor-facing MetaFund experience.
+Build the investor-facing MetaFund dashboard.
 
 ## Phase 8 — Admin Command Center
-
-Build controlled administrative management and audit views.
+Provide controlled investor, capital, allocation, ledger, configuration, and audit management.
 
 ## Phase 9 — Community Foundation
-
-Establish the Community domain and its core navigation/data foundation.
+Establish the initial community experience and data boundaries.
 
 ## Phase 10 — Profile / Settings
-
 Complete account-level settings and preferences.
 
-## Phase 11 — Integration Testing
-
-Test the complete lifecycle across domains.
+## Phase 11 — Full Integration Testing
+Test the complete lifecycle across Trade Validator and MetaFund.
 
 ## Phase 12 — Security & Reconciliation Audit
-
-Test RLS, investor isolation, idempotency, accounting consistency, permissions, and failure recovery.
+Verify RLS, investor isolation, permissions, idempotency, accounting consistency, and recovery from failures.
 
 ## Phase 13 — Production Verification
-
-Deploy through Vercel and verify the production system against the acceptance criteria.
+Deploy and verify against the acceptance criteria.
 
 ---
 
-# Future Integrations
+# What Is NOT Required Yet
 
-External integrations remain part of the long-term architecture.
+The current stage does **not** depend on:
 
-### Payments
+- Stripe
+- Kora
+- another payment gateway
+- MT5 API
+- broker API
+- automated broker execution
+- automated withdrawals
+- automated settlement
+- external KYC infrastructure
+
+These are future integration boundaries.
+
+They should not delay the current product.
+
+The internal MetaFund architecture should simply leave clean interfaces for them later.
+
+---
+
+# Future Architecture
+
+### Payment integration
 
 ```
 MetaFund
@@ -462,7 +444,7 @@ MetaBrain
 Ledger
 ```
 
-### Trading Execution
+### Trading execution
 
 ```
 Trade Validator
@@ -478,56 +460,39 @@ Execution Event
 MetaBrain
 ```
 
-These boundaries should remain provider-independent.
-
-A future provider such as Stripe, Kora, MT5, or another service should be an implementation behind an integration boundary, not the foundation of the internal domain model.
-
----
-
-# Long-Term Vision
-
-The long-term MetaBrain Trader system is intended to become a broader trading and investment technology platform:
-
-**Trade Intelligence**
-
-→ **Decision Validation**
-
-→ **Execution Infrastructure**
-
-→ **Broker Connectivity**
-
-→ **Investor Capital Infrastructure**
-
-→ **Performance & Accounting**
-
-→ **Community**
-
-→ **Analytics**
-
-→ **Subscriptions**
-
-→ **External Financial Infrastructure**
-
-The current friends-and-family MetaFund is a controlled first stage of that larger system.
-
-The architecture should remain extensible, but the current build should only implement what is required now.
+Future providers should sit behind provider-independent integration boundaries.
 
 ---
 
 # Source of Truth
 
-When documentation, previous prompts, generated code, and production behavior disagree:
+When documentation, old prompts, generated code, or assumptions disagree with the running system:
 
-**the actual system must be inspected before a decision is made.**
+**inspect the actual system.**
 
-The repository, database behavior, deployed application, and security configuration are the reality.
+The authoritative reality is:
 
-Documentation exists to communicate the intended architecture and direction.
+- the repository;
+- the database behavior;
+- the deployed application;
+- backend functions;
+- security configuration;
+- production verification.
+
+Documentation communicates intent.
+
+It does not replace inspection.
 
 ---
 
-## Current Mission
+# Current Mission
 
-**Make MetaBrain Trader a reliable, auditable, intelligent trading platform — starting with a strong Trade Validator and a controlled MetaFund investor-performance system, while preserving a clean path toward the larger vision.**
+**Make MetaBrain Trader a reliable, auditable, intelligent trading platform — starting with a strong Trade Validator and a controlled MetaFund investor-performance system.**
 
-**Build the foundation correctly. Keep the boundaries clean. Move fast without creating technical debt.**
+Build the core correctly.
+
+Keep the boundaries clean.
+
+Move fast without creating disposable architecture.
+
+Then expand.
