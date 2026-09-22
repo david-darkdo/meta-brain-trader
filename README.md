@@ -496,3 +496,266 @@ Keep the boundaries clean.
 Move fast without creating disposable architecture.
 
 Then expand.
+
+
+---
+
+# MetaFund Architecture Decisions — Current Working Model
+
+The following decisions were established after the initial README was written and are now part of the working product architecture.
+
+## App Navigation Model
+
+MetaBrain Trader is an application, not a conventional website dashboard.
+
+The primary navigation is fixed around four independent product surfaces:
+
+1. Trade Validator
+2. MetaFund
+3. Community
+4. Profile
+
+Primary navigation belongs in the app's bottom navigation on supported app layouts.
+
+Profile contains account/settings functionality. For authorized operators, Profile/Settings exposes the Admin entry point to a separate administrative command center.
+
+The four primary surfaces should not be replaced by a large website-style sidebar as the main product navigation.
+
+## MetaFund Result Model
+
+MetaFund uses a percentage-based trading result model.
+
+The trader records the authoritative result of a closed trade during Post-Trade, for example:
+
+- +2.00%
+- -1.25%
+- 0.00%
+
+That percentage is consumed by both the existing Post-Trade/AI pipeline and MetaFund's deterministic accounting engine.
+
+There must be one authoritative trade result. MetaFund must not create a second independent result system.
+
+## Per-Trade Capital Snapshot
+
+An investor's capital participating in a trade is determined at the time that trade becomes eligible/participating.
+
+Example:
+
+    Trade starts:
+    Investor capital = $10,000
+
+    During the trade:
+    Investor deposits $5,000
+
+    Trade closes:
+    Trade result = +2%
+
+    MetaFund calculation:
+    $10,000 × 2% = $200
+
+The later $5,000 deposit must not retroactively affect the already-open trade.
+
+The new capital becomes available for future eligible trades according to its activation timestamp.
+
+This requires an immutable or auditable per-trade participation/capital snapshot.
+
+## Risk vs Participation Capital
+
+MetaFund must distinguish:
+
+- Participating Capital — investor capital used as the base for that trade's result.
+- Risk % — the strategy/trade risk percentage.
+- Risk Amount — the monetary risk implied by participating capital and the trade's risk percentage.
+
+These are related but are not the same financial concept.
+
+The existing Trade Validator already contains trade-level risk/account information. MetaFund should consume authoritative data rather than recreate it.
+
+## Compounding
+
+Within an active investment cycle, realized investor P&L contributes to the investor's current economic equity.
+
+Example:
+
+    Starting capital       $10,000
+    Cycle profit            $1,000
+    Current equity          $11,000
+
+    Next eligible trade uses $11,000
+
+The next trade therefore uses the current eligible equity/capital snapshot, not the original opening capital.
+
+## Cycle Settlement and Profit Share
+
+The default investment cycle is 3 months, but the duration must be configurable.
+
+The system must not scatter hard-coded 90-day or equivalent logic throughout the application.
+
+A configurable investment/cycle policy should support durations such as days, months, and years, with the default currently set to 3 months.
+
+At cycle settlement, net cycle profit is allocated according to the configured profit-sharing rule.
+
+The current working economic configuration is:
+
+    Investor share: 70%
+    Company/operator share: 30%
+
+This is a configurable business rule, not a value that should be hard-coded across frontend components.
+
+The system should settle the cycle before rolling the investor's share into the next settled capital base.
+
+## Withdrawal Settlement
+
+Withdrawals require explicit orchestration because a withdrawal can occur before the current cycle naturally expires.
+
+The working rule is:
+
+> A withdrawal request crystallizes the applicable current-cycle performance before the withdrawal is processed.
+
+Example:
+
+    Current settled capital: $10,000
+    Current cycle P&L:       +$2,000
+    Current economic equity: $12,000
+
+    Cycle settlement:
+    Investor share:          +$1,400
+    Company share:            +$600
+
+    Investor settled capital:
+    $10,000 + $1,400 = $11,400
+
+    Withdrawal:
+    $5,000
+
+    Remaining investor capital:
+    $6,400
+
+The exact implementation must account for active/committed capital and must prevent withdrawals from bypassing open-trade exposure.
+
+A withdrawal request should therefore have a controlled lifecycle rather than directly editing an investor balance.
+
+## Active Trade Protection
+
+The accounting model must distinguish, where required:
+
+- available capital/equity;
+- capital committed to active trades;
+- capital snapshots attached to specific trades;
+- settled investor capital;
+- unsettled current-cycle performance.
+
+An investor must not be able to withdraw capital that is currently required to support an active trade.
+
+If necessary, a withdrawal request waits until required active trades close and their authoritative results are recorded before settlement/processing.
+
+## Accounting Source of Truth
+
+Investor balances must never be freely edited as a number.
+
+Financial state must be derived from auditable accounting events such as:
+
+- capital activation;
+- additional capital;
+- trade participation;
+- trade profit/loss;
+- cycle settlement;
+- investor profit share;
+- company/operator profit share;
+- withdrawal;
+- adjustment;
+- reversal/correction.
+
+The ledger is authoritative. Dashboard balances are projections/read models derived from the accounting state.
+
+Configuration may change business rules. It must not rewrite accounting history.
+
+## Role Model
+
+The initial role model is intentionally small:
+
+- Admin / Trader / Owner — operator role for the current business.
+- Investor — investor-facing role.
+
+The operator uses the same application as everyone else.
+
+The operator does not enter a separate admin application from the primary navigation.
+
+Instead:
+
+    Profile
+      ↓
+    Settings
+      ↓
+    Admin
+      ↓
+    Admin Command Center
+
+The Admin Command Center is a separate protected administrative surface containing operational functionality such as investors, capital events, investment cycles, allocations, performance, withdrawals, ledger, configuration, notifications, and audit.
+
+## Foundation-First Principle
+
+The project must be built from the foundation upward.
+
+Before adding visible features, determine the underlying canonical models, state transitions, ownership boundaries, accounting invariants, security policies, and integration points that those features depend upon.
+
+The preferred sequence is:
+
+    REALITY AUDIT
+        ↓
+    CANONICAL ARCHITECTURE
+        ↓
+    FOUNDATION / DATA MODEL
+        ↓
+    DOMAIN SERVICES & STATE TRANSITIONS
+        ↓
+    INTEGRATION WITH EXISTING TRADE VALIDATOR
+        ↓
+    READ MODELS
+        ↓
+    USER INTERFACES
+        ↓
+    ADMIN / OPERATIONS
+        ↓
+    COMMUNITY / SECONDARY FEATURES
+        ↓
+    FULL VERIFICATION
+
+The exact implementation order must be determined after the Stage Zero Reality Audit.
+
+Do not assume the order above is final without reconciling it against the actual production database, codebase, deployed Edge Functions, RLS, and existing Trade Validator dependencies.
+
+## Stage Zero Gate
+
+Before implementing MetaFund or restructuring the application, the system must undergo a complete reality audit.
+
+The audit must inspect the actual:
+
+- repository;
+- route tree;
+- page/component architecture;
+- state management;
+- Supabase migrations;
+- current production database schema;
+- database functions;
+- triggers;
+- RLS policies;
+- storage policies;
+- Edge Functions;
+- AI orchestration;
+- Trade Validator stages;
+- Post-Trade workflow;
+- result model;
+- job processing;
+- Strategy OS;
+- dashboard/read models;
+- authentication;
+- authorization;
+- deployment configuration;
+- environment configuration;
+- production deployment;
+- known legacy/schema drift.
+
+The audit must identify what is canonical, what is legacy, what is incomplete, what is reusable, what is unsafe to modify, and what is missing.
+
+**No major implementation should begin until the audit report and resulting implementation roadmap have been reviewed and reconciled.**
