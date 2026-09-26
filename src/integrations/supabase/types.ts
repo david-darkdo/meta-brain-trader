@@ -74,6 +74,231 @@ export type Database = {
           },
         ]
       }
+      capital_events: {
+        Row: {
+          activated_at: string | null
+          amount: number
+          created_at: string
+          created_by: string | null
+          currency: string
+          event_type: Database["public"]["Enums"]["capital_event_type"]
+          id: string
+          idempotency_key: string
+          investor_id: string
+          notes: string | null
+          status: Database["public"]["Enums"]["capital_event_status"]
+          updated_at: string
+        }
+        Insert: {
+          activated_at?: string | null
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          event_type: Database["public"]["Enums"]["capital_event_type"]
+          id?: string
+          idempotency_key: string
+          investor_id: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["capital_event_status"]
+          updated_at?: string
+        }
+        Update: {
+          activated_at?: string | null
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          event_type?: Database["public"]["Enums"]["capital_event_type"]
+          id?: string
+          idempotency_key?: string
+          investor_id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["capital_event_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "capital_events_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investor_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      financial_ledger: {
+        Row: {
+          amount: number
+          created_at: string
+          currency: string
+          cycle_id: string | null
+          description: string
+          event_type: Database["public"]["Enums"]["ledger_event_type"]
+          id: string
+          idempotency_key: string
+          investor_id: string
+          metadata: Json
+          participation_id: string | null
+          reference_id: string | null
+          running_balance_after: number | null
+          trade_id: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string
+          currency?: string
+          cycle_id?: string | null
+          description: string
+          event_type: Database["public"]["Enums"]["ledger_event_type"]
+          id?: string
+          idempotency_key: string
+          investor_id: string
+          metadata?: Json
+          participation_id?: string | null
+          reference_id?: string | null
+          running_balance_after?: number | null
+          trade_id?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          currency?: string
+          cycle_id?: string | null
+          description?: string
+          event_type?: Database["public"]["Enums"]["ledger_event_type"]
+          id?: string
+          idempotency_key?: string
+          investor_id?: string
+          metadata?: Json
+          participation_id?: string | null
+          reference_id?: string | null
+          running_balance_after?: number | null
+          trade_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "financial_ledger_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "investment_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_ledger_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investor_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_ledger_participation_id_fkey"
+            columns: ["participation_id"]
+            isOneToOne: false
+            referencedRelation: "trade_participations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "financial_ledger_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["trade_id"]
+          },
+        ]
+      }
+      investment_cycles: {
+        Row: {
+          company_profit_share_pct: number
+          config_version: number
+          created_at: string
+          cycle_number: number
+          duration_unit: Database["public"]["Enums"]["cycle_duration_unit"]
+          duration_value: number
+          end_date: string
+          id: string
+          investor_profit_share_pct: number
+          name: string
+          settled_at: string | null
+          start_date: string
+          status: Database["public"]["Enums"]["investment_cycle_status"]
+          total_realized_pnl: number | null
+          updated_at: string
+        }
+        Insert: {
+          company_profit_share_pct?: number
+          config_version?: number
+          created_at?: string
+          cycle_number: number
+          duration_unit?: Database["public"]["Enums"]["cycle_duration_unit"]
+          duration_value?: number
+          end_date: string
+          id?: string
+          investor_profit_share_pct?: number
+          name: string
+          settled_at?: string | null
+          start_date: string
+          status?: Database["public"]["Enums"]["investment_cycle_status"]
+          total_realized_pnl?: number | null
+          updated_at?: string
+        }
+        Update: {
+          company_profit_share_pct?: number
+          config_version?: number
+          created_at?: string
+          cycle_number?: number
+          duration_unit?: Database["public"]["Enums"]["cycle_duration_unit"]
+          duration_value?: number
+          end_date?: string
+          id?: string
+          investor_profit_share_pct?: number
+          name?: string
+          settled_at?: string | null
+          start_date?: string
+          status?: Database["public"]["Enums"]["investment_cycle_status"]
+          total_realized_pnl?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "investment_cycles_config_version_fkey"
+            columns: ["config_version"]
+            isOneToOne: false
+            referencedRelation: "platform_configuration"
+            referencedColumns: ["version"]
+          },
+        ]
+      }
+      investor_accounts: {
+        Row: {
+          account_number: string
+          created_at: string
+          currency: string
+          id: string
+          status: Database["public"]["Enums"]["investor_account_status"]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          account_number: string
+          created_at?: string
+          currency?: string
+          id?: string
+          status?: Database["public"]["Enums"]["investor_account_status"]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          account_number?: string
+          created_at?: string
+          currency?: string
+          id?: string
+          status?: Database["public"]["Enums"]["investor_account_status"]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       job_queue: {
         Row: {
           attempts: number
@@ -121,39 +346,6 @@ export type Database = {
           },
         ]
       }
-      learning_insights: {
-        Row: {
-          category: Database["public"]["Enums"]["insight_category"]
-          content: string
-          created_at: string
-          id: string
-          occurrences: number
-          referenced_trade_ids: string[]
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          category: Database["public"]["Enums"]["insight_category"]
-          content: string
-          created_at?: string
-          id?: string
-          occurrences?: number
-          referenced_trade_ids?: string[]
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          category?: Database["public"]["Enums"]["insight_category"]
-          content?: string
-          created_at?: string
-          id?: string
-          occurrences?: number
-          referenced_trade_ids?: string[]
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       orchestration_logs: {
         Row: {
           blocked_prompts: Json
@@ -193,6 +385,54 @@ export type Database = {
           status?: string
           trade_id?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      platform_configuration: {
+        Row: {
+          base_currency: string
+          company_profit_share_pct: number
+          created_at: string
+          default_cycle_duration_unit: Database["public"]["Enums"]["cycle_duration_unit"]
+          default_cycle_duration_value: number
+          id: string
+          investor_profit_share_pct: number
+          is_active: boolean
+          notes: string | null
+          risk_basis: Database["public"]["Enums"]["risk_basis_type"]
+          supported_display_currencies: string[]
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          base_currency?: string
+          company_profit_share_pct?: number
+          created_at?: string
+          default_cycle_duration_unit?: Database["public"]["Enums"]["cycle_duration_unit"]
+          default_cycle_duration_value?: number
+          id?: string
+          investor_profit_share_pct?: number
+          is_active?: boolean
+          notes?: string | null
+          risk_basis?: Database["public"]["Enums"]["risk_basis_type"]
+          supported_display_currencies?: string[]
+          updated_at?: string
+          version: number
+        }
+        Update: {
+          base_currency?: string
+          company_profit_share_pct?: number
+          created_at?: string
+          default_cycle_duration_unit?: Database["public"]["Enums"]["cycle_duration_unit"]
+          default_cycle_duration_value?: number
+          id?: string
+          investor_profit_share_pct?: number
+          is_active?: boolean
+          notes?: string | null
+          risk_basis?: Database["public"]["Enums"]["risk_basis_type"]
+          supported_display_currencies?: string[]
+          updated_at?: string
+          version?: number
         }
         Relationships: []
       }
@@ -364,7 +604,7 @@ export type Database = {
           {
             foreignKeyName: "results_trade_id_fkey"
             columns: ["trade_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "trades"
             referencedColumns: ["trade_id"]
           },
@@ -590,6 +830,82 @@ export type Database = {
         }
         Relationships: []
       }
+      trade_participations: {
+        Row: {
+          created_at: string
+          cycle_id: string | null
+          id: string
+          idempotency_key: string
+          investor_gross_pnl: number | null
+          investor_id: string
+          participation_timestamp: string
+          participating_capital_snapshot: number
+          result_pnl_percent: number | null
+          risk_amount: number
+          risk_basis: Database["public"]["Enums"]["risk_basis_type"]
+          risk_pct: number
+          status: Database["public"]["Enums"]["participation_status"]
+          trade_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          cycle_id?: string | null
+          id?: string
+          idempotency_key: string
+          investor_gross_pnl?: number | null
+          investor_id: string
+          participation_timestamp?: string
+          participating_capital_snapshot: number
+          result_pnl_percent?: number | null
+          risk_amount?: number
+          risk_basis?: Database["public"]["Enums"]["risk_basis_type"]
+          risk_pct?: number
+          status?: Database["public"]["Enums"]["participation_status"]
+          trade_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          cycle_id?: string | null
+          id?: string
+          idempotency_key?: string
+          investor_gross_pnl?: number | null
+          investor_id?: string
+          participation_timestamp?: string
+          participating_capital_snapshot?: number
+          result_pnl_percent?: number | null
+          risk_amount?: number
+          risk_basis?: Database["public"]["Enums"]["risk_basis_type"]
+          risk_pct?: number
+          status?: Database["public"]["Enums"]["participation_status"]
+          trade_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "trade_participations_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "investment_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_participations_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investor_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "trade_participations_trade_id_fkey"
+            columns: ["trade_id"]
+            isOneToOne: false
+            referencedRelation: "trades"
+            referencedColumns: ["trade_id"]
+          },
+        ]
+      }
       trades: {
         Row: {
           account_size: number | null
@@ -688,6 +1004,27 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           created_at: string
@@ -709,8 +1046,93 @@ export type Database = {
         }
         Relationships: []
       }
+      withdrawal_requests: {
+        Row: {
+          company_profit_share_deducted: number | null
+          created_at: string
+          crystallized_performance_pnl: number | null
+          currency: string
+          cycle_id: string | null
+          id: string
+          investor_id: string
+          net_disbursed_amount: number | null
+          payout_details: Json | null
+          processed_at: string | null
+          rejection_reason: string | null
+          requested_amount: number
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: Database["public"]["Enums"]["withdrawal_status"]
+          updated_at: string
+        }
+        Insert: {
+          company_profit_share_deducted?: number | null
+          created_at?: string
+          crystallized_performance_pnl?: number | null
+          currency?: string
+          cycle_id?: string | null
+          id?: string
+          investor_id: string
+          net_disbursed_amount?: number | null
+          payout_details?: Json | null
+          processed_at?: string | null
+          rejection_reason?: string | null
+          requested_amount: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["withdrawal_status"]
+          updated_at?: string
+        }
+        Update: {
+          company_profit_share_deducted?: number | null
+          created_at?: string
+          crystallized_performance_pnl?: number | null
+          currency?: string
+          cycle_id?: string | null
+          id?: string
+          investor_id?: string
+          net_disbursed_amount?: number | null
+          payout_details?: Json | null
+          processed_at?: string | null
+          rejection_reason?: string | null
+          requested_amount?: number
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: Database["public"]["Enums"]["withdrawal_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "withdrawal_requests_cycle_id_fkey"
+            columns: ["cycle_id"]
+            isOneToOne: false
+            referencedRelation: "investment_cycles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "withdrawal_requests_investor_id_fkey"
+            columns: ["investor_id"]
+            isOneToOne: false
+            referencedRelation: "investor_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
+      company_financial_summary: {
+        Row: {
+          active_investors_count: number | null
+          company_net_earnings: number | null
+          gross_trading_pnl: number | null
+          net_company_equity: number | null
+          open_trades_count: number | null
+          total_activated_capital: number | null
+          total_committed_trade_capital: number | null
+          total_withdrawn_capital: number | null
+        }
+        Relationships: []
+      }
       dashboard_metrics: {
         Row: {
           agreement_score: number | null
@@ -728,16 +1150,154 @@ export type Database = {
         }
         Relationships: []
       }
+      investor_financial_summary: {
+        Row: {
+          account_number: string | null
+          active_committed_capital: number | null
+          available_capital: number | null
+          closed_trades_count: number | null
+          created_at: string | null
+          currency: string | null
+          current_cycle_realized_pnl: number | null
+          current_economic_equity: number | null
+          investor_id: string | null
+          open_trades_count: number | null
+          settled_capital: number | null
+          status: Database["public"]["Enums"]["investor_account_status"] | null
+          total_deposited: number | null
+          total_withdrawn: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      portfolio_exposure_summary: {
+        Row: {
+          direction: string | null
+          entry_price: number | null
+          pair: string | null
+          participating_investors_count: number | null
+          risk_pct: number | null
+          total_active_risk_exposure: number | null
+          total_committed_capital: number | null
+          trade_created_at: string | null
+          trade_id: string | null
+          trade_status: Database["public"]["Enums"]["trade_status"] | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
-      owns_trade: { Args: { _trade_id: string }; Returns: boolean }
+      activate_capital_event: {
+        Args: {
+          p_event_id: string
+          p_admin_user_id?: string
+        }
+        Returns: Json
+      }
+      crystallize_and_approve_withdrawal: {
+        Args: {
+          p_withdrawal_id: string
+          p_admin_user_id?: string
+        }
+        Returns: Json
+      }
+      get_investor_financial_position: {
+        Args: {
+          p_investor_id: string
+        }
+        Returns: {
+          active_committed_capital: number
+          available_capital: number
+          closed_trades_count: number
+          current_cycle_realized_pnl: number
+          current_economic_equity: number
+          open_trades_count: number
+          settled_capital: number
+          total_deposited: number
+          total_withdrawn: number
+        }[]
+      }
+      is_admin: {
+        Args: {
+          p_user_id?: string
+        }
+        Returns: boolean
+      }
+      is_investor: {
+        Args: {
+          p_user_id?: string
+        }
+        Returns: boolean
+      }
+      is_trader: {
+        Args: {
+          p_user_id?: string
+        }
+        Returns: boolean
+      }
+      owns_trade: {
+        Args: {
+          _trade_id: string
+        }
+        Returns: boolean
+      }
+      process_trade_allocation: {
+        Args: {
+          p_trade_id: string
+        }
+        Returns: Json
+      }
+      snapshot_trade_participation: {
+        Args: {
+          p_trade_id: string
+          p_risk_basis?: Database["public"]["Enums"]["risk_basis_type"]
+        }
+        Returns: Json
+      }
     }
     Enums: {
       analysis_stage: "BLIND" | "COMPARATIVE" | "VERDICT"
       analysis_type: "PRE" | "POST"
+      app_role: "ADMIN" | "TRADER" | "INVESTOR"
+      capital_event_status: "PENDING" | "ACTIVATED" | "REJECTED" | "CANCELLED"
+      capital_event_type:
+        | "INITIAL_CAPITAL"
+        | "ADDITIONAL_CAPITAL"
+        | "WITHDRAWAL"
+        | "ADJUSTMENT"
+        | "REVERSAL"
+      cycle_duration_unit: "DAYS" | "WEEKS" | "MONTHS" | "YEARS"
       insight_category: "MISTAKE" | "STRENGTH" | "PATTERN" | "NOTE"
+      investment_cycle_status:
+        | "UPCOMING"
+        | "ACTIVE"
+        | "SETTLING"
+        | "SETTLED"
+        | "CLOSED"
+      investor_account_status:
+        | "PENDING_APPROVAL"
+        | "ACTIVE"
+        | "SUSPENDED"
+        | "CLOSED"
       job_status: "QUEUED" | "RUNNING" | "SUCCEEDED" | "FAILED"
+      ledger_event_type:
+        | "CAPITAL_ACTIVATED"
+        | "ADDITIONAL_CAPITAL"
+        | "TRADE_ALLOCATION_PROFIT"
+        | "TRADE_ALLOCATION_LOSS"
+        | "CYCLE_SETTLEMENT_PROFIT"
+        | "CYCLE_SETTLEMENT_INVESTOR_SHARE"
+        | "CYCLE_SETTLEMENT_COMPANY_SHARE"
+        | "WITHDRAWAL_REQUESTED"
+        | "WITHDRAWAL_PROCESSED"
+        | "ADJUSTMENT"
+        | "REVERSAL"
       outcome_type: "WIN" | "LOSS" | "BREAKEVEN" | "CANCELLED"
+      participation_status:
+        | "COMMITTED"
+        | "ALLOCATED"
+        | "SETTLED"
+        | "CANCELLED"
       processing_step:
         | "PENDING"
         | "BLIND"
@@ -766,6 +1326,10 @@ export type Database = {
         | "WHAT_I_LEARNED"
         | "PROMISE_TO_MYSELF"
         | "GENERAL"
+      risk_basis_type:
+        | "AVAILABLE_CAPITAL"
+        | "PARTICIPATING_CAPITAL"
+        | "ACCOUNT_EQUITY"
       screenshot_phase: "PRE" | "POST"
       screenshot_shot_type:
         | "ENTRY"
@@ -785,6 +1349,15 @@ export type Database = {
         | "JOURNALED"
         | "DELETED"
       verdict_type: "APPROVED" | "DISQUALIFIED" | "NEUTRAL"
+      withdrawal_status:
+        | "REQUESTED"
+        | "UNDER_REVIEW"
+        | "WAITING_FOR_OPEN_TRADES"
+        | "PERFORMANCE_CRYSTALLIZATION_REQUIRED"
+        | "APPROVED"
+        | "PROCESSED"
+        | "REJECTED"
+        | "CANCELLED"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -914,9 +1487,51 @@ export const Constants = {
     Enums: {
       analysis_stage: ["BLIND", "COMPARATIVE", "VERDICT"],
       analysis_type: ["PRE", "POST"],
+      app_role: ["ADMIN", "TRADER", "INVESTOR"],
+      capital_event_status: ["PENDING", "ACTIVATED", "REJECTED", "CANCELLED"],
+      capital_event_type: [
+        "INITIAL_CAPITAL",
+        "ADDITIONAL_CAPITAL",
+        "WITHDRAWAL",
+        "ADJUSTMENT",
+        "REVERSAL",
+      ],
+      cycle_duration_unit: ["DAYS", "WEEKS", "MONTHS", "YEARS"],
       insight_category: ["MISTAKE", "STRENGTH", "PATTERN", "NOTE"],
+      investment_cycle_status: [
+        "UPCOMING",
+        "ACTIVE",
+        "SETTLING",
+        "SETTLED",
+        "CLOSED",
+      ],
+      investor_account_status: [
+        "PENDING_APPROVAL",
+        "ACTIVE",
+        "SUSPENDED",
+        "CLOSED",
+      ],
       job_status: ["QUEUED", "RUNNING", "SUCCEEDED", "FAILED"],
+      ledger_event_type: [
+        "CAPITAL_ACTIVATED",
+        "ADDITIONAL_CAPITAL",
+        "TRADE_ALLOCATION_PROFIT",
+        "TRADE_ALLOCATION_LOSS",
+        "CYCLE_SETTLEMENT_PROFIT",
+        "CYCLE_SETTLEMENT_INVESTOR_SHARE",
+        "CYCLE_SETTLEMENT_COMPANY_SHARE",
+        "WITHDRAWAL_REQUESTED",
+        "WITHDRAWAL_PROCESSED",
+        "ADJUSTMENT",
+        "REVERSAL",
+      ],
       outcome_type: ["WIN", "LOSS", "BREAKEVEN", "CANCELLED"],
+      participation_status: [
+        "COMMITTED",
+        "ALLOCATED",
+        "SETTLED",
+        "CANCELLED",
+      ],
       processing_step: [
         "PENDING",
         "BLIND",
@@ -947,6 +1562,11 @@ export const Constants = {
         "PROMISE_TO_MYSELF",
         "GENERAL",
       ],
+      risk_basis_type: [
+        "AVAILABLE_CAPITAL",
+        "PARTICIPATING_CAPITAL",
+        "ACCOUNT_EQUITY",
+      ],
       screenshot_phase: ["PRE", "POST"],
       screenshot_shot_type: [
         "ENTRY",
@@ -968,6 +1588,16 @@ export const Constants = {
         "DELETED",
       ],
       verdict_type: ["APPROVED", "DISQUALIFIED", "NEUTRAL"],
+      withdrawal_status: [
+        "REQUESTED",
+        "UNDER_REVIEW",
+        "WAITING_FOR_OPEN_TRADES",
+        "PERFORMANCE_CRYSTALLIZATION_REQUIRED",
+        "APPROVED",
+        "PROCESSED",
+        "REJECTED",
+        "CANCELLED",
+      ],
     },
   },
 } as const
