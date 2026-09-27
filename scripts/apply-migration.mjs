@@ -6,7 +6,10 @@ const tokenMatch = env.match(/superbase_Access_Tokens\s*=\s*(.+)/);
 let token = tokenMatch ? tokenMatch[1].trim().replace(/^["']|["']$/g, '') : null;
 const projectRef = 'jqptprskuxkhfoxsvwcl';
 
-const sql = fs.readFileSync('supabase/migrations/20260926000000_build_1a_financial_foundation.sql', 'utf8');
+const migrationFile = process.argv[2] || 'supabase/migrations/20260927000000_build_1a_hardening.sql';
+console.log(`Applying migration file: ${migrationFile}`);
+
+const sql = fs.readFileSync(migrationFile, 'utf8');
 
 console.log('Sending migration query to Supabase Management API...');
 
@@ -29,12 +32,14 @@ const req = https.request({
     } else {
       console.error('Migration failed:');
       console.error(data);
+      process.exit(1);
     }
   });
 });
 
 req.on('error', err => {
   console.error('Request error:', err);
+  process.exit(1);
 });
 
 req.write(JSON.stringify({ query: sql }));
