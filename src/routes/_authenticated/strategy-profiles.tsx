@@ -372,7 +372,7 @@ function EngineEditor({
         if (!uid) throw new Error("Please sign in to save prompts to cloud.");
         const { data, error } = await supabase
           .from("strategy_os")
-          .upsert({ user_id: uid, [engine.key]: next }, { onConflict: "user_id" })
+          .upsert({ user_id: uid, [engine.key]: next } as any, { onConflict: "user_id" })
           .select("id,version,updated_at")
           .single();
         if (error) throw error;

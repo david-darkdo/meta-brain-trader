@@ -292,7 +292,7 @@ function TradeDetail() {
 
   const updateTradeMut = useMutation({
     mutationFn: async ({ rerunAi }: { rerunAi: boolean }) => {
-      const payload: Record<string, any> = {
+      const payload = {
         pair: editForm.pair.trim().toUpperCase(),
         direction: editForm.direction,
         entry_price: editForm.entry_price ? parseFloat(editForm.entry_price) : null,
@@ -747,8 +747,8 @@ function TradeDetail() {
           {/* LEVEL 1: POST-TRADE DECISION COCKPIT */}
           <PostTradeCockpit trade={t} result={resultQ.data ?? null} analyses={postAnalyses} />
 
-          <ResultForm tradeId={t.trade_id} existingResult={resultQ.data} />
-          <PostScreenshotUploader tradeId={t.trade_id} />
+          <ResultForm tradeId={t.trade_id} />
+          <PostScreenshotUploader tradeId={t.trade_id} userId={t.user_id} />
 
 
 

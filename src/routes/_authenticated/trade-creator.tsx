@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import { Database } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -171,7 +172,7 @@ function TradeCreator() {
               url: u.path,
               user_label: u.label,
               is_primary: u.is_primary,
-              shot_type: u.shot_type,
+              shot_type: u.shot_type as Database["public"]["Enums"]["screenshot_shot_type"],
               analysis_phase: "PRE" as const,
             })),
           );
