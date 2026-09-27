@@ -59,10 +59,21 @@ export function ResultForm({ tradeId }: { tradeId: string }) {
         const { error } = await supabase.from("results").insert(payload);
         if (error) throw error;
       }
+
+      // If pnl_percent is present, invoke idempotent MetaFund allocation
+      if (pnlPercent !== "" && !isNaN(Number(pnlPercent))) {
+        try {
+          await supabase.rpc("process_trade_result_allocation", { p_trade_id: tradeId });
+        } catch (allocErr) {
+          console.warn("MetaFund allocation notice:", allocErr);
+        }
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["trade", tradeId, "result"] });
-      toast.success("Result saved");
+      qc.invalidateQueries({ queryKey: ["investor"] });
+      qc.invalidateQueries({ queryKey: ["admin"] });
+      toast.success("Result saved and financial allocations processed");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
