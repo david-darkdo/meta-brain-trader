@@ -78,42 +78,60 @@ export type Database = {
         Row: {
           activated_at: string | null
           amount: number
+          base_amount_usd: number | null
           created_at: string
           created_by: string | null
           currency: string
           event_type: Database["public"]["Enums"]["capital_event_type"]
+          exchange_rate_to_usd: number | null
+          fx_rate_timestamp: string | null
+          fx_source: string | null
           id: string
           idempotency_key: string
           investor_id: string
           notes: string | null
+          original_amount: number | null
+          original_currency: string | null
           status: Database["public"]["Enums"]["capital_event_status"]
           updated_at: string
         }
         Insert: {
           activated_at?: string | null
           amount: number
+          base_amount_usd?: number | null
           created_at?: string
           created_by?: string | null
           currency?: string
           event_type: Database["public"]["Enums"]["capital_event_type"]
+          exchange_rate_to_usd?: number | null
+          fx_rate_timestamp?: string | null
+          fx_source?: string | null
           id?: string
           idempotency_key: string
           investor_id: string
           notes?: string | null
+          original_amount?: number | null
+          original_currency?: string | null
           status?: Database["public"]["Enums"]["capital_event_status"]
           updated_at?: string
         }
         Update: {
           activated_at?: string | null
           amount?: number
+          base_amount_usd?: number | null
           created_at?: string
           created_by?: string | null
           currency?: string
           event_type?: Database["public"]["Enums"]["capital_event_type"]
+          exchange_rate_to_usd?: number | null
+          fx_rate_timestamp?: string | null
+          fx_source?: string | null
           id?: string
           idempotency_key?: string
           investor_id?: string
           notes?: string | null
+          original_amount?: number | null
+          original_currency?: string | null
           status?: Database["public"]["Enums"]["capital_event_status"]
           updated_at?: string
         }
@@ -135,10 +153,13 @@ export type Database = {
           cycle_id: string | null
           description: string
           event_type: Database["public"]["Enums"]["ledger_event_type"]
+          exchange_rate_to_usd: number | null
           id: string
           idempotency_key: string
           investor_id: string
           metadata: Json
+          original_amount: number | null
+          original_currency: string | null
           participation_id: string | null
           reference_id: string | null
           running_balance_after: number | null
@@ -151,10 +172,13 @@ export type Database = {
           cycle_id?: string | null
           description: string
           event_type: Database["public"]["Enums"]["ledger_event_type"]
+          exchange_rate_to_usd?: number | null
           id?: string
           idempotency_key: string
           investor_id: string
           metadata?: Json
+          original_amount?: number | null
+          original_currency?: string | null
           participation_id?: string | null
           reference_id?: string | null
           running_balance_after?: number | null
@@ -167,10 +191,13 @@ export type Database = {
           cycle_id?: string | null
           description?: string
           event_type?: Database["public"]["Enums"]["ledger_event_type"]
+          exchange_rate_to_usd?: number | null
           id?: string
           idempotency_key?: string
           investor_id?: string
           metadata?: Json
+          original_amount?: number | null
+          original_currency?: string | null
           participation_id?: string | null
           reference_id?: string | null
           running_balance_after?: number | null
@@ -345,6 +372,39 @@ export type Database = {
             referencedColumns: ["trade_id"]
           },
         ]
+      }
+      learning_insights: {
+        Row: {
+          category: Database["public"]["Enums"]["insight_category"]
+          content: string
+          created_at: string
+          id: string
+          occurrences: number
+          referenced_trade_ids: string[]
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          category: Database["public"]["Enums"]["insight_category"]
+          content: string
+          created_at?: string
+          id?: string
+          occurrences?: number
+          referenced_trade_ids?: string[]
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          category?: Database["public"]["Enums"]["insight_category"]
+          content?: string
+          created_at?: string
+          id?: string
+          occurrences?: number
+          referenced_trade_ids?: string[]
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       orchestration_logs: {
         Row: {
@@ -832,52 +892,61 @@ export type Database = {
       }
       trade_participations: {
         Row: {
+          allocated_at: string | null
+          company_cut_usd: number | null
           created_at: string
           cycle_id: string | null
+          gross_pnl_usd: number | null
           id: string
-          idempotency_key: string
-          investor_gross_pnl: number | null
           investor_id: string
-          participation_timestamp: string
-          participating_capital_snapshot: number
-          result_pnl_percent: number | null
-          risk_amount: number
+          loss_absorbed_usd: number | null
+          net_pnl_usd: number | null
+          participating_amount_usd: number
+          profit_split_company_pct: number
+          profit_split_investor_pct: number
+          risk_amount_usd: number
           risk_basis: Database["public"]["Enums"]["risk_basis_type"]
-          risk_pct: number
+          risk_percentage: number
           status: Database["public"]["Enums"]["participation_status"]
           trade_id: string
           updated_at: string
         }
         Insert: {
+          allocated_at?: string | null
+          company_cut_usd?: number | null
           created_at?: string
           cycle_id?: string | null
+          gross_pnl_usd?: number | null
           id?: string
-          idempotency_key: string
-          investor_gross_pnl?: number | null
           investor_id: string
-          participation_timestamp?: string
-          participating_capital_snapshot: number
-          result_pnl_percent?: number | null
-          risk_amount?: number
+          loss_absorbed_usd?: number | null
+          net_pnl_usd?: number | null
+          participating_amount_usd: number
+          profit_split_company_pct?: number
+          profit_split_investor_pct?: number
+          risk_amount_usd: number
           risk_basis?: Database["public"]["Enums"]["risk_basis_type"]
-          risk_pct?: number
+          risk_percentage?: number
           status?: Database["public"]["Enums"]["participation_status"]
           trade_id: string
           updated_at?: string
         }
         Update: {
+          allocated_at?: string | null
+          company_cut_usd?: number | null
           created_at?: string
           cycle_id?: string | null
+          gross_pnl_usd?: number | null
           id?: string
-          idempotency_key?: string
-          investor_gross_pnl?: number | null
           investor_id?: string
-          participation_timestamp?: string
-          participating_capital_snapshot?: number
-          result_pnl_percent?: number | null
-          risk_amount?: number
+          loss_absorbed_usd?: number | null
+          net_pnl_usd?: number | null
+          participating_amount_usd?: number
+          profit_split_company_pct?: number
+          profit_split_investor_pct?: number
+          risk_amount_usd?: number
           risk_basis?: Database["public"]["Enums"]["risk_basis_type"]
-          risk_pct?: number
+          risk_percentage?: number
           status?: Database["public"]["Enums"]["participation_status"]
           trade_id?: string
           updated_at?: string
@@ -915,6 +984,7 @@ export type Database = {
           direction: string
           entry_price: number | null
           executed: boolean
+          executed_at: string | null
           notes: string | null
           pair: string
           processing_error: string | null
@@ -937,6 +1007,7 @@ export type Database = {
           direction: string
           entry_price?: number | null
           executed?: boolean
+          executed_at?: string | null
           notes?: string | null
           pair: string
           processing_error?: string | null
@@ -959,6 +1030,7 @@ export type Database = {
           direction?: string
           entry_price?: number | null
           executed?: boolean
+          executed_at?: string | null
           notes?: string | null
           pair?: string
           processing_error?: string | null
@@ -1122,14 +1194,20 @@ export type Database = {
     Views: {
       company_financial_summary: {
         Row: {
-          active_investors_count: number | null
-          company_net_earnings: number | null
-          gross_trading_pnl: number | null
-          net_company_equity: number | null
+          active_investors: number | null
+          closed_trades_count: number | null
+          net_trading_pnl: number | null
           open_trades_count: number | null
-          total_activated_capital: number | null
-          total_committed_trade_capital: number | null
-          total_withdrawn_capital: number | null
+          pending_company_profit_share: number | null
+          total_active_committed_capital: number | null
+          total_active_risk_amount: number | null
+          total_available_capital: number | null
+          total_deposited: number | null
+          total_economic_equity: number | null
+          total_gross_loss: number | null
+          total_gross_profit: number | null
+          total_investors: number | null
+          total_withdrawn: number | null
         }
         Relationships: []
       }
@@ -1153,19 +1231,47 @@ export type Database = {
       investor_financial_summary: {
         Row: {
           account_number: string | null
+          account_status: Database["public"]["Enums"]["investor_account_status"] | null
           active_committed_capital: number | null
           available_capital: number | null
           closed_trades_count: number | null
-          created_at: string | null
+          cumulative_deposited: number | null
+          cumulative_withdrawn: number | null
           currency: string | null
-          current_cycle_realized_pnl: number | null
+          current_contributed_capital: number | null
           current_economic_equity: number | null
           investor_id: string | null
           open_trades_count: number | null
+          realized_trading_pnl: number | null
           settled_capital: number | null
-          status: Database["public"]["Enums"]["investor_account_status"] | null
-          total_deposited: number | null
-          total_withdrawn: number | null
+          user_id: string | null
+        }
+        Relationships: []
+      }
+      investor_trade_history: {
+        Row: {
+          account_number: string | null
+          closing_price: number | null
+          created_at: string | null
+          cycle_id: string | null
+          cycle_number: number | null
+          direction: string | null
+          entry_price: number | null
+          investor_gross_pnl: number | null
+          investor_id: string | null
+          investor_net_pnl: number | null
+          outcome: Database["public"]["Enums"]["outcome_type"] | null
+          pair: string | null
+          participating_capital_snapshot: number | null
+          participation_id: string | null
+          participation_status: Database["public"]["Enums"]["participation_status"] | null
+          pnl_percent: number | null
+          risk_amount: number | null
+          risk_pct: number | null
+          trade_entry_time: string | null
+          trade_id: string | null
+          trade_status: Database["public"]["Enums"]["trade_status"] | null
+          updated_at: string | null
           user_id: string | null
         }
         Relationships: []
@@ -1173,15 +1279,11 @@ export type Database = {
       portfolio_exposure_summary: {
         Row: {
           direction: string | null
-          entry_price: number | null
+          investors_exposed_count: number | null
+          open_trades_count: number | null
           pair: string | null
-          participating_investors_count: number | null
-          risk_pct: number | null
-          total_active_risk_exposure: number | null
           total_committed_capital: number | null
-          trade_created_at: string | null
-          trade_id: string | null
-          trade_status: Database["public"]["Enums"]["trade_status"] | null
+          total_risk_amount: number | null
         }
         Relationships: []
       }
@@ -1189,15 +1291,53 @@ export type Database = {
     Functions: {
       activate_capital_event: {
         Args: {
-          p_event_id: string
-          p_admin_user_id?: string
+          p_amount: number
+          p_currency?: string
+          p_effective_at?: string
+          p_exchange_rate?: number
+          p_fx_source?: string
+          p_idempotency_key?: string | null
+          p_investor_id: string
+          p_notes?: string | null
         }
         Returns: Json
       }
-      crystallize_and_approve_withdrawal: {
+      activate_investment_cycle: {
         Args: {
-          p_withdrawal_id: string
-          p_admin_user_id?: string
+          p_cycle_id: string
+        }
+        Returns: Json
+      }
+      approve_withdrawal: {
+        Args: {
+          p_admin_notes?: string | null
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      calculate_risk_basis: {
+        Args: {
+          p_account_id: string
+          p_basis_mode: Database["public"]["Enums"]["risk_basis_type"]
+          p_risk_pct?: number
+        }
+        Returns: number
+      }
+      close_investment_cycle: {
+        Args: {
+          p_cycle_id: string
+        }
+        Returns: Json
+      }
+      create_investment_cycle: {
+        Args: {
+          p_company_split?: number
+          p_end_date: string
+          p_investor_split?: number
+          p_management_fee?: number
+          p_name: string
+          p_notes?: string | null
+          p_start_date: string
         }
         Returns: Json
       }
@@ -1206,15 +1346,15 @@ export type Database = {
           p_investor_id: string
         }
         Returns: {
-          active_committed_capital: number
-          available_capital: number
+          active_committed_capital_usd: number
+          available_capital_usd: number
           closed_trades_count: number
-          current_cycle_realized_pnl: number
-          current_economic_equity: number
+          cumulative_deposited_usd: number
+          cumulative_withdrawn_usd: number
+          current_economic_equity_usd: number
           open_trades_count: number
-          settled_capital: number
-          total_deposited: number
-          total_withdrawn: number
+          realized_trading_pnl_usd: number
+          settled_capital_usd: number
         }[]
       }
       is_admin: {
@@ -1241,16 +1381,49 @@ export type Database = {
         }
         Returns: boolean
       }
-      process_trade_allocation: {
+      process_trade_result_allocation: {
         Args: {
           p_trade_id: string
         }
         Returns: Json
       }
-      snapshot_trade_participation: {
+      reconcile_financial_system: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          check_code: string
+          check_name: string
+          details: Json
+          discrepancy_count: number
+          severity: string
+        }[]
+      }
+      reject_withdrawal: {
+        Args: {
+          p_reason: string
+          p_request_id: string
+        }
+        Returns: Json
+      }
+      request_withdrawal: {
+        Args: {
+          p_account_id: string
+          p_amount: number
+          p_idempotency_key?: string | null
+          p_notes?: string | null
+        }
+        Returns: Json
+      }
+      settle_withdrawal: {
+        Args: {
+          p_idempotency_key?: string | null
+          p_request_id: string
+          p_settlement_ref?: string | null
+        }
+        Returns: Json
+      }
+      snapshot_trade_participations: {
         Args: {
           p_trade_id: string
-          p_risk_basis?: Database["public"]["Enums"]["risk_basis_type"]
         }
         Returns: Json
       }
@@ -1373,12 +1546,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1402,11 +1575,11 @@ export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1427,11 +1600,11 @@ export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1452,11 +1625,11 @@ export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
     | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
-    : never) = never,
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
@@ -1469,11 +1642,11 @@ export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
     | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
-    : never) = never,
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals
 }
