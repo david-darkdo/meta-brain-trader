@@ -13,6 +13,8 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedValidatorRouteImport } from './routes/_authenticated/validator'
+import { Route as AuthenticatedCommunityRouteImport } from './routes/_authenticated/community'
 import { Route as AuthenticatedTradeCreatorRouteImport } from './routes/_authenticated/trade-creator'
 import { Route as AuthenticatedStrategyProfilesRouteImport } from './routes/_authenticated/strategy-profiles'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
@@ -40,6 +42,16 @@ const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedValidatorRoute = AuthenticatedValidatorRouteImport.update({
+  id: '/validator',
+  path: '/validator',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedCommunityRoute = AuthenticatedCommunityRouteImport.update({
+  id: '/community',
+  path: '/community',
+  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedTradeCreatorRoute =
   AuthenticatedTradeCreatorRouteImport.update({
@@ -97,6 +109,8 @@ export interface FileRoutesByFullPath {
   '/profile': typeof AuthenticatedProfileRoute
   '/strategy-profiles': typeof AuthenticatedStrategyProfilesRoute
   '/trade-creator': typeof AuthenticatedTradeCreatorRoute
+  '/validator': typeof AuthenticatedValidatorRoute
+  '/community': typeof AuthenticatedCommunityRoute
   '/trade-detail/$id': typeof AuthenticatedTradeDetailIdRoute
 }
 export interface FileRoutesByTo {
@@ -110,6 +124,8 @@ export interface FileRoutesByTo {
   '/profile': typeof AuthenticatedProfileRoute
   '/strategy-profiles': typeof AuthenticatedStrategyProfilesRoute
   '/trade-creator': typeof AuthenticatedTradeCreatorRoute
+  '/validator': typeof AuthenticatedValidatorRoute
+  '/community': typeof AuthenticatedCommunityRoute
   '/trade-detail/$id': typeof AuthenticatedTradeDetailIdRoute
 }
 export interface FileRoutesById {
@@ -125,6 +141,8 @@ export interface FileRoutesById {
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/strategy-profiles': typeof AuthenticatedStrategyProfilesRoute
   '/_authenticated/trade-creator': typeof AuthenticatedTradeCreatorRoute
+  '/_authenticated/validator': typeof AuthenticatedValidatorRoute
+  '/_authenticated/community': typeof AuthenticatedCommunityRoute
   '/_authenticated/trade-detail/$id': typeof AuthenticatedTradeDetailIdRoute
 }
 export interface FileRouteTypes {
@@ -140,6 +158,8 @@ export interface FileRouteTypes {
     | '/profile'
     | '/strategy-profiles'
     | '/trade-creator'
+    | '/validator'
+    | '/community'
     | '/trade-detail/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -153,6 +173,8 @@ export interface FileRouteTypes {
     | '/profile'
     | '/strategy-profiles'
     | '/trade-creator'
+    | '/validator'
+    | '/community'
     | '/trade-detail/$id'
   id:
     | '__root__'
@@ -167,6 +189,8 @@ export interface FileRouteTypes {
     | '/_authenticated/profile'
     | '/_authenticated/strategy-profiles'
     | '/_authenticated/trade-creator'
+    | '/_authenticated/validator'
+    | '/_authenticated/community'
     | '/_authenticated/trade-detail/$id'
   fileRoutesById: FileRoutesById
 }
@@ -249,6 +273,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/validator': {
+      id: '/_authenticated/validator'
+      path: '/validator'
+      fullPath: '/validator'
+      preLoaderRoute: typeof AuthenticatedValidatorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/community': {
+      id: '/_authenticated/community'
+      path: '/community'
+      fullPath: '/community'
+      preLoaderRoute: typeof AuthenticatedCommunityRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/command-center': {
       id: '/_authenticated/command-center'
       path: '/command-center'
@@ -274,6 +312,8 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedStrategyProfilesRoute: typeof AuthenticatedStrategyProfilesRoute
   AuthenticatedTradeCreatorRoute: typeof AuthenticatedTradeCreatorRoute
+  AuthenticatedValidatorRoute: typeof AuthenticatedValidatorRoute
+  AuthenticatedCommunityRoute: typeof AuthenticatedCommunityRoute
   AuthenticatedTradeDetailIdRoute: typeof AuthenticatedTradeDetailIdRoute
 }
 
@@ -285,6 +325,8 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedStrategyProfilesRoute: AuthenticatedStrategyProfilesRoute,
   AuthenticatedTradeCreatorRoute: AuthenticatedTradeCreatorRoute,
+  AuthenticatedValidatorRoute: AuthenticatedValidatorRoute,
+  AuthenticatedCommunityRoute: AuthenticatedCommunityRoute,
   AuthenticatedTradeDetailIdRoute: AuthenticatedTradeDetailIdRoute,
 }
 

@@ -31,7 +31,7 @@ function AuthPage() {
 
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
-      if (data.user) navigate({ to: search.redirect ?? "/dashboard" });
+      if (data.user) navigate({ to: search.redirect ?? "/validator" });
     }).catch(() => null);
   }, [navigate, search.redirect]);
 
@@ -47,11 +47,11 @@ function AuthPage() {
         });
         if (error) throw error;
         toast.success("Account created. Welcome aboard.");
-        navigate({ to: "/dashboard" });
+        navigate({ to: "/validator" });
       } else if (mode === "signin") {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        navigate({ to: search.redirect ?? "/dashboard" });
+        navigate({ to: search.redirect ?? "/validator" });
       } else {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
           redirectTo: `${window.location.origin}/reset-password`,
@@ -128,7 +128,7 @@ function AuthPage() {
                   });
                   if (result.error) throw result.error;
                   if (result.redirected) return;
-                  navigate({ to: search.redirect ?? "/dashboard" });
+                  navigate({ to: search.redirect ?? "/validator" });
                 } catch (err) {
                   toast.error(err instanceof Error ? err.message : "Google sign-in failed");
                 } finally {
