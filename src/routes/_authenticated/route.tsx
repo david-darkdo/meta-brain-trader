@@ -1,8 +1,8 @@
 import { createFileRoute, Outlet, redirect, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { LayoutDashboard, PlusCircle, UserCircle, LogOut, BookMarked } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { LayoutDashboard, PlusCircle, UserCircle, LogOut, BookMarked, Wallet, Building2 } from "lucide-react";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -27,6 +27,23 @@ function AuthenticatedLayout() {
   const queryClient = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
+  const roleQ = useQuery({
+    queryKey: ["auth_user_roles"],
+    queryFn: async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return { isAdmin: false, isInvestor: false };
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", u.user.id);
+      const roleList = (roles ?? []).map((r) => r.role);
+      return {
+        isAdmin: roleList.includes("ADMIN"),
+        isInvestor: roleList.includes("INVESTOR"),
+      };
+    },
+  });
+
   async function signOut() {
     await queryClient.cancelQueries();
     queryClient.clear();
@@ -37,6 +54,8 @@ function AuthenticatedLayout() {
   const nav = [
     { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
     { to: "/trade-creator", label: "New trade", icon: PlusCircle },
+    { to: "/metafund", label: "MetaFund", icon: Wallet },
+    ...(roleQ.data?.isAdmin ? [{ to: "/command-center", label: "Command Center", icon: Building2 }] : []),
     { to: "/strategy-profiles", label: "Strategies", icon: BookMarked },
     { to: "/profile", label: "Profile", icon: UserCircle },
   ] as const;
