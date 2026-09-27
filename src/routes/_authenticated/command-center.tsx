@@ -1,6 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import {
   fetchCompanyFinancialSummary,
   fetchAllInvestors,
@@ -50,10 +51,28 @@ import {
   Activity,
   Sliders,
   Lock,
+  ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/command-center")({
+  beforeLoad: async () => {
+    try {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) throw redirect({ to: "/auth" });
+      const { data: roles } = await supabase
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", u.user.id);
+      const isAdmin = (roles ?? []).some((r) => r.role === "ADMIN");
+      if (!isAdmin) {
+        throw redirect({ to: "/validator" });
+      }
+    } catch (err: any) {
+      if (err?.to || err?.isRedirect) throw err;
+      throw redirect({ to: "/validator" });
+    }
+  },
   head: () => ({ meta: [{ title: "Command Center — MetaFund Operations" }] }),
   component: CompanyCommandCenter,
 });
@@ -216,16 +235,23 @@ function CompanyCommandCenter() {
   return (
     <div className="space-y-8">
       {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">Company Command Center</h1>
-            <Badge variant="outline" className="border-primary text-primary">ADMIN OPERATIONAL ENGINE</Badge>
+      <div className="space-y-4">
+        <Link
+          to="/profile"
+          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          <ArrowLeft className="h-4 w-4" /> Back to Profile & Settings
+        </Link>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold tracking-tight">Company Command Center</h1>
+              <Badge variant="outline" className="border-primary text-primary">ADMIN OPERATIONAL ENGINE</Badge>
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Financial controls, multi-currency activation, risk basis governance, and ledger auditing.
+            </p>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Financial controls, multi-currency activation, risk basis governance, and ledger auditing.
-          </p>
-        </div>
 
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ["admin"] })}>
@@ -315,6 +341,7 @@ function CompanyCommandCenter() {
           </Dialog>
         </div>
       </div>
+    </div>
 
       {/* METRIC OVERVIEW CARDS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
