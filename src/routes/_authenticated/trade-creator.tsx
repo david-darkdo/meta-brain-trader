@@ -2,7 +2,6 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
-import { Database } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -181,6 +180,13 @@ function TradeCreator() {
       }
 
       if (mode === "run") {
+        // Snapshot eligible MetaFund participations at trade execution time
+        try {
+          await supabase.rpc("snapshot_trade_participations", { p_trade_id: tradeId });
+        } catch (snapErr) {
+          console.warn("Participation snapshot notice:", snapErr);
+        }
+
         // Trigger orchestrate-pipeline edge function immediately
         try {
           const { data: { session } } = await supabase.auth.getSession();
@@ -349,8 +355,7 @@ function TradeCreator() {
               <Input type="file" multiple accept="image/*" className="mt-4 max-w-xs" onChange={onFileChange} />
             </div>
 
-            {shots.length > 0 && (
-              <div className="grid gap-4 sm:grid-cols-2">
+            {shots.length > 0 && (\n              <div className="grid gap-4 sm:grid-cols-2">
                 {shots.map((s, idx) => (
                   <div key={idx} className="relative overflow-hidden rounded-md border border-border bg-card p-3">
                     <button
