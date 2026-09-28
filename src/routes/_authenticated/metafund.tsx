@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import {
@@ -6,7 +6,6 @@ import {
   fetchInvestorTradeHistory,
   fetchInvestorWithdrawalRequests,
   requestInvestorWithdrawal,
-  type InvestorSummary,
   type InvestorTradeHistoryRow,
 } from "@/lib/metafund-api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -25,26 +24,28 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
-  DollarSign,
-  TrendingUp,
-  ShieldCheck,
-  Lock,
   ArrowUpRight,
-  ArrowDownLeft,
   Clock,
   CheckCircle2,
   AlertCircle,
   RefreshCw,
+  Layers,
+  Calendar,
+  Wallet,
+  TrendingUp,
+  ChevronRight,
+  ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/metafund")({
-  head: () => ({ meta: [{ title: "MetaFund — Investor Dashboard" }] }),
+  head: () => ({ meta: [{ title: "MetaFund — Investor Platform" }] }),
   component: InvestorMetaFundDashboard,
 });
 
 function InvestorMetaFundDashboard() {
   const qc = useQueryClient();
+  const [activeTab, setActiveTab] = useState<"trades" | "withdrawals" | "capital">("trades");
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalNotes, setWithdrawalNotes] = useState("");
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
@@ -78,7 +79,9 @@ function InvestorMetaFundDashboard() {
       const amt = Number(withdrawalAmount);
       if (isNaN(amt) || amt <= 0) throw new Error("Please enter a valid positive withdrawal amount.");
       if (amt > (summaryQ.data.available_capital ?? 0)) {
-        throw new Error(`Requested amount ($${amt}) exceeds available capital ($${summaryQ.data.available_capital ?? 0}).`);
+        throw new Error(
+          `Requested amount ($${amt}) exceeds available capital ($${summaryQ.data.available_capital ?? 0}).`
+        );
       }
 
       return requestInvestorWithdrawal({
@@ -105,7 +108,7 @@ function InvestorMetaFundDashboard() {
   if (summaryQ.isLoading) {
     return (
       <div className="flex h-96 items-center justify-center space-x-2">
-        <RefreshCw className="h-6 w-6 animate-spin text-primary" />
+        <RefreshCw className="h-6 w-6 animate-spin text-amber-400" />
         <span className="text-muted-foreground text-sm">Loading MetaFund investor position...</span>
       </div>
     );
@@ -120,7 +123,8 @@ function InvestorMetaFundDashboard() {
             <AlertCircle className="h-5 w-5" /> Failed to load MetaFund position
           </CardTitle>
           <CardDescription>
-            {(summaryQ.error as any)?.message || "An error occurred while connecting to the financial engine."}
+            {(summaryQ.error as any)?.message ||
+              "An error occurred while connecting to the financial engine."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -136,9 +140,11 @@ function InvestorMetaFundDashboard() {
   if (!s || !s.investor_id) {
     return (
       <div className="mx-auto max-w-2xl text-center py-16 space-y-4">
-        <ShieldCheck className="mx-auto h-12 w-12 text-muted-foreground" />
-        <h2 className="text-2xl font-bold tracking-tight">No Active Investor Account</h2>
-        <p className="text-muted-foreground text-sm">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
+          <ShieldCheck className="h-7 w-7" />
+        </div>
+        <h2 className="text-2xl font-bold tracking-tight text-foreground">No Active Investor Account</h2>
+        <p className="text-muted-foreground text-sm max-w-md mx-auto">
           Your profile is not currently registered as an active MetaFund investor. Please contact the fund administrator for capital onboarding.
         </p>
       </div>
@@ -151,60 +157,68 @@ function InvestorMetaFundDashboard() {
   const pnl = Number(s.realized_trading_pnl ?? 0);
   const deposited = Number(s.cumulative_deposited ?? 0);
   const withdrawn = Number(s.cumulative_withdrawn ?? 0);
+  const pnlPct = deposited > 0 ? (pnl / deposited) * 100 : 0;
 
   return (
-    <div className="space-y-8">
-      {/* HEADER */}
+    <div className="space-y-6">
+      {/* 1. PLATFORM TITLE */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <div className="flex items-center gap-3">
-            <h1 className="text-3xl font-bold tracking-tight">MetaFund</h1>
-            <Badge variant={s.account_status === "ACTIVE" ? "default" : "secondary"}>
-              {s.account_status ?? "ACTIVE"}
-            </Badge>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Account: <span className="font-mono text-foreground">{s.account_number}</span> · Accounting Base: <span className="font-semibold text-foreground">USD</span>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-sans">
+            MetaFund
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            Your Capital. Our Discipline. Shared Growth.
           </p>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ["investor"] })}>
-            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => qc.invalidateQueries({ queryKey: ["investor"] })}
+            className="border-border/80 bg-secondary/40 text-xs h-8"
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
           </Button>
 
           <Dialog open={isWithdrawModalOpen} onOpenChange={setIsWithdrawModalOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" disabled={available <= 0}>
-                <ArrowUpRight className="h-4 w-4 mr-1" /> Request Withdrawal
+              <Button size="sm" disabled={available <= 0} className="gold-gradient-btn text-xs h-8">
+                <ArrowUpRight className="h-3.5 w-3.5 mr-1" /> Request Withdrawal
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-md bg-card border-border">
               <DialogHeader>
-                <DialogTitle>Request Capital Withdrawal</DialogTitle>
+                <DialogTitle className="text-foreground">Request Capital Withdrawal</DialogTitle>
                 <DialogDescription>
-                  Available uncommitted balance: <span className="font-semibold text-foreground">${available.toLocaleString("en-US", { minimumFractionDigits: 2 })} USD</span>
+                  Available uncommitted balance:{" "}
+                  <span className="font-semibold text-amber-400">
+                    ${available.toLocaleString("en-US", { minimumFractionDigits: 2 })} USD
+                  </span>
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-3">
-                <div className="space-y-1">
-                  <Label htmlFor="amount">Withdrawal Amount ($ USD)</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="amount" className="text-xs text-muted-foreground">Withdrawal Amount ($ USD)</Label>
                   <Input
                     id="amount"
                     type="number"
                     step="any"
-                    placeholder="e.g. 5000"
+                    placeholder="e.g. 1000"
                     value={withdrawalAmount}
                     onChange={(e) => setWithdrawalAmount(e.target.value)}
+                    className="bg-secondary/50 border-border focus-visible:ring-amber-400"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="notes">Notes / Payout Instructions (Optional)</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="notes" className="text-xs text-muted-foreground">Payout Instructions / Destination</Label>
                   <Input
                     id="notes"
                     placeholder="e.g. USDT TRC20 / Bank account"
                     value={withdrawalNotes}
                     onChange={(e) => setWithdrawalNotes(e.target.value)}
+                    className="bg-secondary/50 border-border focus-visible:ring-amber-400"
                   />
                 </div>
               </div>
@@ -213,6 +227,7 @@ function InvestorMetaFundDashboard() {
                   Cancel
                 </Button>
                 <Button
+                  className="gold-gradient-btn"
                   disabled={requestWithdrawalMutation.isPending || !withdrawalAmount}
                   onClick={() => requestWithdrawalMutation.mutate()}
                 >
@@ -224,261 +239,322 @@ function InvestorMetaFundDashboard() {
         </div>
       </div>
 
-      {/* METRIC CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Economic Equity</CardTitle>
-            <DollarSign className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${equity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-            <p className="text-xs text-muted-foreground mt-1">Total economic equity</p>
-          </CardContent>
-        </Card>
+      {/* 2. HERO TOTAL ECONOMIC EQUITY CARD */}
+      <div className="relative overflow-hidden rounded-2xl gold-card-hero p-5 sm:p-7">
+        <div className="flex flex-col space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Total Economic Equity
+            </span>
+            <span
+              className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                pnl >= 0
+                  ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                  : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+              }`}
+            >
+              {pnl >= 0 ? "+" : ""}
+              {pnlPct.toFixed(2)}%
+            </span>
+          </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Available Cash</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              ${available.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <div>
+            <div className="text-3xl sm:text-4xl font-extrabold text-foreground tracking-tight font-mono">
+              ${equity.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Uncommitted & withdrawable</p>
-          </CardContent>
-        </Card>
+            <p className="text-[11px] text-muted-foreground mt-0.5">All-Time Performance Base (USD)</p>
+          </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Committed Capital</CardTitle>
-            <Lock className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
-              ${committed.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          {/* 3-METRIC STRIP */}
+          <div className="grid grid-cols-3 gap-2 pt-3 border-t border-amber-500/20 text-left">
+            <div>
+              <div className="text-xs text-muted-foreground">Invested</div>
+              <div className="text-sm sm:text-base font-bold text-foreground font-mono mt-0.5">
+                ${deposited.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Locked in {s.open_trades_count ?? 0} active open trade(s)</p>
-          </CardContent>
-        </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Realized Trading P&L</CardTitle>
-            <TrendingUp className={`h-4 w-4 ${pnl >= 0 ? "text-emerald-500" : "text-rose-500"}`} />
-          </CardHeader>
-          <CardContent>
-            <div className={`text-2xl font-bold ${pnl >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}`}>
-              {pnl >= 0 ? "+" : ""}${pnl.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            <div>
+              <div className="text-xs text-muted-foreground">Total P&L</div>
+              <div
+                className={`text-sm sm:text-base font-bold font-mono mt-0.5 ${
+                  pnl >= 0 ? "text-emerald-400" : "text-rose-400"
+                }`}
+              >
+                {pnl >= 0 ? "+" : ""}${pnl.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+              </div>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{s.closed_trades_count ?? 0} closed trade allocations</p>
-          </CardContent>
-        </Card>
+
+            <div>
+              <div className="text-xs text-muted-foreground">Available</div>
+              <div className="text-sm sm:text-base font-bold text-amber-400 font-mono mt-0.5">
+                ${available.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      {/* TABS NAVIGATION */}
-      <Tabs defaultValue="trades" className="space-y-4">
-        <TabsList>
-          <TabsTrigger value="trades">Trade Participations</TabsTrigger>
-          <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
-          <TabsTrigger value="capital">Capital Flow</TabsTrigger>
-        </TabsList>
-
-        {/* TRADES TAB */}
-        <TabsContent value="trades" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Trade Participation History</CardTitle>
-              <CardDescription>
-                Authoritative per-trade execution participation, risk allocations, and net profit-share outcomes.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {tradeHistoryQ.isLoading ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">Loading participations...</div>
-              ) : tradeHistoryQ.data && tradeHistoryQ.data.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-muted-foreground">
-                        <th className="py-2 px-3">Date</th>
-                        <th className="py-2 px-3">Pair</th>
-                        <th className="py-2 px-3">Direction</th>
-                        <th className="py-2 px-3">Participating Capital</th>
-                        <th className="py-2 px-3">Risk Amt</th>
-                        <th className="py-2 px-3">Trade Result</th>
-                        <th className="py-2 px-3">Gross P&L</th>
-                        <th className="py-2 px-3">Investor Net Share</th>
-                        <th className="py-2 px-3">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {tradeHistoryQ.data.map((t: InvestorTradeHistoryRow, idx: number) => {
-                        const netPnl = Number(t.investor_net_pnl ?? 0);
-                        const grossPnl = Number(t.investor_gross_pnl ?? 0);
-                        return (
-                          <tr key={idx} className="border-b border-border/50 hover:bg-muted/30">
-                            <td className="py-2 px-3 text-muted-foreground">
-                              {t.created_at ? new Date(t.created_at).toLocaleDateString() : "—"}
-                            </td>
-                            <td className="py-2 px-3 font-semibold">{t.pair ?? "—"}</td>
-                            <td className="py-2 px-3">
-                              <Badge variant={t.direction === "BUY" ? "default" : "secondary"}>
-                                {t.direction ?? "—"}
-                              </Badge>
-                            </td>
-                            <td className="py-2 px-3 font-mono">
-                              ${Number(t.participating_capital_snapshot ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                            </td>
-                            <td className="py-2 px-3 font-mono text-muted-foreground">
-                              ${Number(t.risk_amount ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })} ({t.risk_pct ?? 2}%)
-                            </td>
-                            <td className="py-2 px-3 font-semibold">
-                              {t.result_pnl_percent !== null ? `${t.result_pnl_percent > 0 ? "+" : ""}${t.result_pnl_percent}%` : "OPEN"}
-                            </td>
-                            <td className="py-2 px-3 font-mono">
-                              {t.investor_gross_pnl !== null ? `${grossPnl >= 0 ? "+" : ""}$${grossPnl.toFixed(2)}` : "—"}
-                            </td>
-                            <td className={`py-2 px-3 font-mono font-bold ${netPnl >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                              {t.investor_net_pnl !== null ? `${netPnl >= 0 ? "+" : ""}$${netPnl.toFixed(2)}` : "—"}
-                            </td>
-                            <td className="py-2 px-3">
-                              <Badge variant={t.status === "ALLOCATED" ? "outline" : "default"}>
-                                {t.status ?? "COMMITTED"}
-                              </Badge>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="py-12 text-center text-muted-foreground space-y-1">
-                  <p className="text-base font-medium">No Trade Participations Yet</p>
-                  <p className="text-xs">When the trade engine executes eligible trades, your participating capital will snapshot here.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* WITHDRAWALS TAB */}
-        <TabsContent value="withdrawals" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Withdrawal Requests</CardTitle>
-              <CardDescription>
-                Track the status of your requested capital withdrawals from submission to final settlement.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {withdrawalsQ.isLoading ? (
-                <div className="py-8 text-center text-sm text-muted-foreground">Loading withdrawal records...</div>
-              ) : withdrawalsQ.data && withdrawalsQ.data.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-border text-muted-foreground">
-                        <th className="py-2 px-3">Requested At</th>
-                        <th className="py-2 px-3">Amount ($ USD)</th>
-                        <th className="py-2 px-3">Status</th>
-                        <th className="py-2 px-3">Processed Date</th>
-                        <th className="py-2 px-3">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {withdrawalsQ.data.map((w: any) => (
-                        <tr key={w.id} className="border-b border-border/50 hover:bg-muted/30">
-                          <td className="py-2 px-3 text-muted-foreground">
-                            {new Date(w.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="py-2 px-3 font-mono font-bold">
-                            ${Number(w.requested_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                          </td>
-                          <td className="py-2 px-3">
-                            <Badge
-                              variant={
-                                w.status === "PROCESSED"
-                                  ? "default"
-                                  : w.status === "APPROVED"
-                                  ? "outline"
-                                  : w.status === "REJECTED" || w.status === "CANCELLED"
-                                  ? "destructive"
-                                  : "secondary"
-                              }
-                            >
-                              {w.status}
-                            </Badge>
-                          </td>
-                          <td className="py-2 px-3 text-muted-foreground">
-                            {w.processed_at ? new Date(w.processed_at).toLocaleDateString() : "Pending"}
-                          </td>
-                          <td className="py-2 px-3 text-xs text-muted-foreground max-w-xs truncate">
-                            {w.notes || w.rejection_reason || "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div className="py-12 text-center text-muted-foreground">
-                  <p className="text-base font-medium">No Withdrawal Requests</p>
-                  <p className="text-xs">You have not submitted any withdrawal requests.</p>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* CAPITAL FLOW TAB */}
-        <TabsContent value="capital" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Capital Summary</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm">
-                <div className="flex justify-between border-b border-border py-2">
-                  <span className="text-muted-foreground">Total Cumulative Deposited</span>
-                  <span className="font-mono font-semibold">${deposited.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between border-b border-border py-2">
-                  <span className="text-muted-foreground">Total Cumulative Withdrawn</span>
-                  <span className="font-mono font-semibold">${withdrawn.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between border-b border-border py-2">
-                  <span className="text-muted-foreground">Net Cumulative Contributed</span>
-                  <span className="font-mono font-semibold">${(deposited - withdrawn).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                </div>
-                <div className="flex justify-between py-2">
-                  <span className="text-muted-foreground">Current Total Economic Equity</span>
-                  <span className="font-mono font-bold text-primary">${equity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Governing Model</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3 text-sm text-muted-foreground">
-                <p>
-                  • Performance fee is calculated strictly on positive net profits under governing cycle terms.
-                </p>
-                <p>
-                  • Trading losses do not incur any company performance fee and are absorbed by the capital pool.
-                </p>
-                <p>
-                  • Capital committed in open trades is protected from withdrawal until trade settlement.
-                </p>
-              </CardContent>
-            </Card>
+      {/* 3. PRIMARY 4 NAVIGATION CARDS (2x2 GRID) */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        {/* MY PARTICIPATIONS */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("trades")}
+          className={`group flex flex-col justify-between rounded-xl border p-4 sm:p-5 text-left transition-all ${
+            activeTab === "trades"
+              ? "border-amber-400/50 bg-card shadow-[0_4px_20px_rgba(245,158,11,0.1)]"
+              : "border-border/80 bg-card/60 hover:bg-card hover:border-border"
+          }`}
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400 group-hover:scale-105 transition-transform">
+            <Layers className="h-5 w-5" />
           </div>
-        </TabsContent>
-      </Tabs>
+          <div className="mt-4">
+            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
+              My Participations
+            </h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {s.open_trades_count ?? 0} active · ${committed.toLocaleString("en-US", { minimumFractionDigits: 0 })} committed
+            </p>
+          </div>
+        </button>
+
+        {/* INVESTMENT CYCLES */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("capital")}
+          className={`group flex flex-col justify-between rounded-xl border p-4 sm:p-5 text-left transition-all ${
+            activeTab === "capital"
+              ? "border-amber-400/50 bg-card shadow-[0_4px_20px_rgba(245,158,11,0.1)]"
+              : "border-border/80 bg-card/60 hover:bg-card hover:border-border"
+          }`}
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-foreground group-hover:scale-105 transition-transform">
+            <Calendar className="h-4 w-4 text-amber-400" />
+          </div>
+          <div className="mt-4">
+            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
+              Investment Cycles
+            </h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              70% / 30% standard profit split
+            </p>
+          </div>
+        </button>
+
+        {/* WITHDRAWALS */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("withdrawals")}
+          className={`group flex flex-col justify-between rounded-xl border p-4 sm:p-5 text-left transition-all ${
+            activeTab === "withdrawals"
+              ? "border-amber-400/50 bg-card shadow-[0_4px_20px_rgba(245,158,11,0.1)]"
+              : "border-border/80 bg-card/60 hover:bg-card hover:border-border"
+          }`}
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-foreground group-hover:scale-105 transition-transform">
+            <Wallet className="h-4 w-4 text-amber-400" />
+          </div>
+          <div className="mt-4">
+            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
+              Withdrawals
+            </h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              ${available.toLocaleString("en-US", { minimumFractionDigits: 0 })} withdrawable cash
+            </p>
+          </div>
+        </button>
+
+        {/* PERFORMANCE */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("capital")}
+          className="group flex flex-col justify-between rounded-xl border border-border/80 bg-card/60 p-4 sm:p-5 text-left transition-all hover:bg-card hover:border-border"
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-foreground group-hover:scale-105 transition-transform">
+            <TrendingUp className="h-4 w-4 text-amber-400" />
+          </div>
+          <div className="mt-4">
+            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
+              Performance
+            </h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {s.closed_trades_count ?? 0} settled trades
+            </p>
+          </div>
+        </button>
+      </div>
+
+      {/* 4. RECENT ACTIVITY & DETAILED TABS */}
+      <div className="space-y-4 pt-2">
+        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="space-y-4">
+          <div className="flex items-center justify-between border-b border-border/70 pb-2">
+            <TabsList className="bg-secondary/40 border border-border/60">
+              <TabsTrigger value="trades" className="text-xs data-[state=active]:text-amber-400">
+                Participations
+              </TabsTrigger>
+              <TabsTrigger value="withdrawals" className="text-xs data-[state=active]:text-amber-400">
+                Withdrawals
+              </TabsTrigger>
+              <TabsTrigger value="capital" className="text-xs data-[state=active]:text-amber-400">
+                Capital Flow
+              </TabsTrigger>
+            </TabsList>
+          </div>
+
+          {/* PARTICIPATIONS TAB */}
+          <TabsContent value="trades" className="space-y-3">
+            {!tradeHistoryQ.data || tradeHistoryQ.data.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-10 text-center bg-card/40">
+                <p className="text-sm text-muted-foreground font-medium">No Trade Participations Recorded</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  When trades are executed in Meta Validator, your participating capital snapshot will appear here.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {tradeHistoryQ.data.map((t: InvestorTradeHistoryRow, idx: number) => {
+                  const netPnl = Number(t.investor_net_pnl ?? 0);
+                  const isPositive = netPnl >= 0;
+                  const isCommitted = t.status === "COMMITTED";
+
+                  return (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between p-3.5 rounded-xl border border-border/70 bg-card/60 hover:bg-card transition-all"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-amber-400">
+                          <Layers className="h-4 w-4" />
+                        </div>
+                        <div>
+                          <div className="text-sm font-semibold text-foreground">
+                            {t.pair ?? "TRADE"}{" "}
+                            <span className="text-xs text-muted-foreground font-normal">· {t.direction}</span>
+                          </div>
+                          <div className="text-[11px] text-muted-foreground">
+                            Snapshot: ${Number(t.participating_capital_snapshot ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })} · Risk: ${Number(t.risk_amount ?? 0).toFixed(2)} ({t.risk_pct}%)
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        {isCommitted ? (
+                          <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-400/30">
+                            COMMITTED
+                          </Badge>
+                        ) : (
+                          <div className={`text-sm font-mono font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+                            {isPositive ? "+" : ""}${netPnl.toFixed(2)}
+                          </div>
+                        )}
+                        <div className="text-[10px] text-muted-foreground mt-0.5">
+                          {t.result_pnl_percent !== null ? `${t.result_pnl_percent > 0 ? "+" : ""}${t.result_pnl_percent}% trade` : "In execution"}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* WITHDRAWALS TAB */}
+          <TabsContent value="withdrawals" className="space-y-3">
+            {!withdrawalsQ.data || withdrawalsQ.data.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-border p-10 text-center bg-card/40">
+                <p className="text-sm text-muted-foreground font-medium">No Withdrawal Requests</p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  You have not submitted any withdrawal requests.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {withdrawalsQ.data.map((w: any) => (
+                  <div
+                    key={w.id}
+                    className="flex items-center justify-between p-3.5 rounded-xl border border-border/70 bg-card/60 hover:bg-card transition-all"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-secondary text-amber-400">
+                        <Wallet className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <div className="text-sm font-bold text-foreground font-mono">
+                          ${Number(w.requested_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {new Date(w.created_at).toLocaleDateString("en-US", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    <Badge
+                      variant={
+                        w.status === "PROCESSED"
+                          ? "default"
+                          : w.status === "APPROVED"
+                            ? "outline"
+                            : w.status === "REJECTED"
+                              ? "destructive"
+                              : "secondary"
+                      }
+                      className="text-xs"
+                    >
+                      {w.status}
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
+          {/* CAPITAL FLOW TAB */}
+          <TabsContent value="capital" className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="bg-card/60 border-border/70">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-bold">Capital Position Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2.5 text-xs">
+                  <div className="flex justify-between border-b border-border/60 py-1.5">
+                    <span className="text-muted-foreground">Cumulative Deposited</span>
+                    <span className="font-mono font-semibold">${deposited.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/60 py-1.5">
+                    <span className="text-muted-foreground">Cumulative Withdrawn</span>
+                    <span className="font-mono font-semibold">${withdrawn.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/60 py-1.5">
+                    <span className="text-muted-foreground">Net Contributed</span>
+                    <span className="font-mono font-semibold">${(deposited - withdrawn).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5">
+                    <span className="text-muted-foreground">Total Economic Equity</span>
+                    <span className="font-mono font-bold text-amber-400">${equity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/60 border-border/70">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-bold">Cycle & Allocation Terms</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-xs text-muted-foreground leading-relaxed">
+                  <p>• Standard 70% Investor / 30% Company profit split on positive closed trades.</p>
+                  <p>• 100% loss absorption by capital pool with $0 company cut on negative results.</p>
+                  <p>• Idempotent immutable ledger postings for all balance changes.</p>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }

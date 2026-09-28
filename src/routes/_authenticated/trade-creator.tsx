@@ -173,7 +173,7 @@ function TradeCreator() {
               url: u.path,
               user_label: u.label,
               is_primary: u.is_primary,
-              shot_type: u.shot_type as any,
+              shot_type: u.shot_type as Database["public"]["Enums"]["screenshot_shot_type"],
               analysis_phase: "PRE" as const,
             })),
           );
@@ -241,9 +241,9 @@ function TradeCreator() {
       </div>
 
       <div className="flex gap-2">
-        <div className={`h-1.5 flex-1 rounded-full ${step >= 1 ? "bg-primary" : "bg-secondary"}`} />
-        <div className={`h-1.5 flex-1 rounded-full ${step >= 2 ? "bg-primary" : "bg-secondary"}`} />
-        <div className={`h-1.5 flex-1 rounded-full ${step >= 3 ? "bg-primary" : "bg-secondary"}`} />
+        <div className={`h-1.5 flex-1 rounded-full ${step >= 1 ? "bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-secondary"}`} />
+        <div className={`h-1.5 flex-1 rounded-full ${step >= 2 ? "bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-secondary"}`} />
+        <div className={`h-1.5 flex-1 rounded-full ${step >= 3 ? "bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-secondary"}`} />
       </div>
 
       {step === 1 && (
@@ -465,7 +465,7 @@ function TradeCreator() {
                   type="button"
                   onClick={() => save("run")}
                   disabled={busy}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold shadow-md shadow-primary/20"
+                  className="gold-gradient-btn font-semibold"
                 >
                   <Sparkles className="mr-2 h-4 w-4" />
                   {busy ? "Executing..." : "SAVE & RUN"}

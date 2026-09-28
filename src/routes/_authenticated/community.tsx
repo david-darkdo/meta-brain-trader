@@ -1,97 +1,96 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Users, ShieldCheck, Zap, Trophy, MessageSquare, Sparkles, Clock } from "lucide-react";
+import { MessageSquare, Share2, GraduationCap, Video, Globe2 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/community")({
-  head: () => ({ meta: [{ title: "Community — MetaBrain Platform" }] }),
+  head: () => ({ meta: [{ title: "Community — MetaBrain Trader" }] }),
   component: CommunityPlatform,
 });
 
 function CommunityPlatform() {
-  const plannedPillars = [
+  const pillars = [
     {
-      title: "Verified Trader Network",
-      description: "Connect with peer traders running institutional strategies with cryptographically verified track records.",
-      icon: ShieldCheck,
-      badge: "Reserved",
-    },
-    {
-      title: "Alpha Syndicates",
-      description: "Collaborative trade validation squads sharing multi-timeframe analysis and high-probability setups.",
-      icon: Zap,
-      badge: "Planned",
-    },
-    {
-      title: "Strategy & Edge Discussions",
-      description: "In-depth post-mortem debriefs on rule execution, market structure shifts, and AI verdict accuracy.",
+      title: "Trader Discussions",
+      description: "Connect with verified traders worldwide, discuss live market conditions, and share setups.",
       icon: MessageSquare,
-      badge: "Planned",
     },
     {
-      title: "Global Performance Leaderboards",
-      description: "Objective rankings based on execution discipline scores, risk management consistency, and audited returns.",
-      icon: Trophy,
-      badge: "Planned",
+      title: "Strategy Sharing",
+      description: "Learn from real executed trading journals, post-mortems, and edge optimization playbooks.",
+      icon: Share2,
+    },
+    {
+      title: "Educational Content",
+      description: "Level up your technical execution, risk management psychology, and algorithmic rules.",
+      icon: GraduationCap,
+    },
+    {
+      title: "Live Events & AMAs",
+      description: "Participate in weekly market reviews, strategy debriefs, and syndicate mastermind sessions.",
+      icon: Video,
     },
   ];
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto">
-      {/* HEADER */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Users className="h-5 w-5" />
+    <div className="space-y-6">
+      {/* 1. PLATFORM TITLE */}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-sans">
+          Community
+        </h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+          Learn. Share. Grow Together.
+        </p>
+      </div>
+
+      {/* 2. HERO CARD — "A Global Community of Disciplined Traders" */}
+      <div className="relative overflow-hidden rounded-2xl gold-card-hero p-5 sm:p-7">
+        <div className="flex items-center justify-between relative z-10">
+          <div className="space-y-2 max-w-sm">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground leading-snug">
+              A Global Community of{" "}
+              <span className="gold-gradient-text">Disciplined Traders</span>
+            </h2>
+            <div className="flex items-center gap-2 pt-1">
+              <Badge className="bg-amber-500/15 text-amber-400 border border-amber-500/30 text-xs font-semibold px-2.5 py-0.5">
+                Coming Soon
+              </Badge>
+              <Badge variant="outline" className="text-xs text-muted-foreground">
+                Under Development
+              </Badge>
             </div>
-            <h1 className="text-3xl font-bold tracking-tight">Community</h1>
-            <Badge variant="secondary" className="gap-1 text-xs">
-              <Clock className="h-3 w-3" />
-              Under Development
-            </Badge>
           </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            The collaborative intelligence layer for MetaBrain traders and capital syndicates.
-          </p>
+
+          {/* Golden Globe Vector Graphic */}
+          <div className="hidden xs:flex shrink-0 items-center justify-center h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-amber-500/10 border border-amber-500/20 shadow-[0_0_25px_rgba(245,158,11,0.15)]">
+            <Globe2 className="h-12 w-12 text-amber-400 animate-pulse" />
+          </div>
         </div>
       </div>
 
-      {/* PLATFORM NOTICE */}
-      <Card className="border-primary/20 bg-primary/5">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg text-foreground">
-            <Sparkles className="h-5 w-5 text-primary" />
-            MetaBrain Community Platform Architecture
-          </CardTitle>
-          <CardDescription className="text-sm">
-            Community is an approved primary sibling platform on the MetaBrain Board. This surface is reserved for verified peer collaboration and strategy syndication once the core validation and capital foundations are fully established.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-
-      {/* ROADMAP PILLARS */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        {plannedPillars.map((p) => (
-          <Card key={p.title} className="relative overflow-hidden">
-            <CardHeader className="pb-2">
-              <div className="flex items-center justify-between">
-                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-primary">
-                  <p.icon className="h-5 w-5" />
-                </div>
-                <Badge variant="outline" className="text-xs">
-                  {p.badge}
-                </Badge>
+      {/* 3. UPCOMING COMMUNITY PILLARS (LIST OF 4 CARDS) */}
+      <div className="space-y-3">
+        {pillars.map((p) => {
+          const Icon = p.icon;
+          return (
+            <div
+              key={p.title}
+              className="flex items-start gap-4 p-4 rounded-xl border border-border/70 bg-card/60 hover:bg-card hover:border-border transition-all"
+            >
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-secondary text-amber-400 mt-0.5">
+                <Icon className="h-5 w-5" />
               </div>
-              <CardTitle className="mt-3 text-base">{p.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-muted-foreground leading-relaxed">
-                {p.description}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
+              <div className="space-y-0.5">
+                <h3 className="text-sm sm:text-base font-semibold text-foreground">
+                  {p.title}
+                </h3>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {p.description}
+                </p>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

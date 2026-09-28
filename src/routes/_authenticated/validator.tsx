@@ -5,18 +5,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
+  Plus,
+  BookOpen,
+  Sliders,
+  Sparkles,
   TrendingUp,
   BarChart3,
   Target,
-  BookOpen,
-  Plus,
-  AlertTriangle,
-  Trophy,
   ShieldCheck,
   Handshake,
-  Activity,
-  BookMarked,
-  Layers,
+  AlertTriangle,
+  ChevronRight,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/validator")({
@@ -26,11 +25,22 @@ export const Route = createFileRoute("/_authenticated/validator")({
 
 function MetaValidatorPlatform() {
   const tradesQ = useQuery({
-    queryKey: ["trades", "recent"],
+    queryKey: ["trades", "recent_list"],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("trades")
-        .select("trade_id, pair, direction, trade_status, created_at")
+        .select(`
+          trade_id,
+          pair,
+          direction,
+          trade_status,
+          created_at,
+          executed_at,
+          results (
+            pnl_percent,
+            outcome
+          )
+        `)
         .order("created_at", { ascending: false })
         .limit(10);
       if (error) throw error;
@@ -53,7 +63,7 @@ function MetaValidatorPlatform() {
         .from("learning_insights")
         .select("id,category,content,occurrences,updated_at")
         .order("occurrences", { ascending: false })
-        .limit(10);
+        .limit(6);
       return data ?? [];
     },
   });
@@ -66,203 +76,291 @@ function MetaValidatorPlatform() {
     { label: "Discipline", value: m ? `${m.discipline_score}` : "—", icon: ShieldCheck },
     { label: "Agreement", value: m ? `${m.agreement_score}` : "—", icon: Handshake },
     { label: "Override", value: m ? `${m.override_score}` : "—", icon: AlertTriangle },
-    { label: "Trust", value: m ? `${m.trust_score}` : "—", icon: BookOpen },
   ];
 
   return (
-    <div className="space-y-8">
-      {/* INTERNAL META VALIDATOR HEADER & TOOLS */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <Activity className="h-5 w-5" />
-            </div>
-            <h1 className="text-3xl font-bold tracking-tight">Meta Validator</h1>
-            <Badge variant="outline" className="text-xs font-mono">
-              AI ENGINE ACTIVE
-            </Badge>
-          </div>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Canonical trading intelligence, edge validation, and execution analytics.
-          </p>
-        </div>
-
-        {/* INTERNAL VALIDATOR NAVIGATION & ACTIONS */}
-        <div className="flex flex-wrap items-center gap-2">
-          <Button asChild variant="outline" size="sm">
-            <Link to="/journal">
-              <Layers className="mr-1.5 h-4 w-4" />
-              Journal
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="sm">
-            <Link to="/strategy-profiles">
-              <BookMarked className="mr-1.5 h-4 w-4" />
-              Strategies
-            </Link>
-          </Button>
-          <Button asChild size="sm">
-            <Link to="/trade-creator">
-              <Plus className="mr-1.5 h-4 w-4" />
-              New Trade
-            </Link>
-          </Button>
-        </div>
+    <div className="space-y-6">
+      {/* 1. PLATFORM TITLE & SUPPORTING STATEMENT */}
+      <div>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-sans">
+          Meta Validator
+        </h1>
+        <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+          Analyze. Execute. Improve.
+        </p>
       </div>
 
-      {/* CORE TRADING METRICS */}
-      <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 lg:grid-cols-7">
-        {stats.map((s) => (
-          <Card key={s.label}>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">{s.label}</CardTitle>
-              <s.icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{s.value}</div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* RULE VIOLATIONS & PROFITABLE BEHAVIORS */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <AlertTriangle className="h-4 w-4 text-destructive" /> Most violated rule
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {m?.most_violated_rule ? (
-              <Link
-                to="/journal"
-                search={{ insight: m.most_violated_rule, category: "MISTAKE" }}
-                className="text-lg font-medium hover:underline text-destructive"
-              >
-                {m.most_violated_rule}
-              </Link>
-            ) : (
-              <p className="text-lg font-medium text-muted-foreground">No data yet</p>
-            )}
-            <p className="mt-1 text-xs text-muted-foreground">Click to inspect trades with this infraction.</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Trophy className="h-4 w-4 text-emerald-500" /> Most profitable behavior
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {m?.most_profitable_behavior ? (
-              <Link
-                to="/journal"
-                search={{ insight: m.most_profitable_behavior, category: "STRENGTH" }}
-                className="text-lg font-medium hover:underline text-emerald-500"
-              >
-                {m.most_profitable_behavior}
-              </Link>
-            ) : (
-              <p className="text-lg font-medium text-muted-foreground">No data yet</p>
-            )}
-            <p className="mt-1 text-xs text-muted-foreground">Recurring strength across recent trades.</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* LEARNING INSIGHTS */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Learning Insights</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!insightsQ.data || insightsQ.data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Insights will appear automatically after your first post-trade analysis executes.
+      {/* 2. HERO CARD — "Disciplined Trading for Real Results" */}
+      <div className="relative overflow-hidden rounded-2xl gold-card-hero p-5 sm:p-7">
+        <div className="flex items-center justify-between relative z-10">
+          <div className="space-y-2 max-w-sm">
+            <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground leading-snug">
+              Disciplined Trading for{" "}
+              <span className="gold-gradient-text">Real Results</span>
+            </h2>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              Multi-timeframe AI edge validation, trade execution rules, and rigorous performance metrics.
             </p>
-          ) : (
-            <ul className="grid gap-3 sm:grid-cols-2">
-              {insightsQ.data.map((i) => (
-                <li key={i.id}>
-                  <Link
-                    to="/journal"
-                    search={{ insight: i.content, category: i.category as "MISTAKE" | "STRENGTH" }}
-                    className="block rounded-md border border-border p-3 transition-colors hover:bg-secondary/40"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <Badge
-                        variant={
-                          i.category === "MISTAKE"
-                            ? "destructive"
-                            : i.category === "STRENGTH"
-                              ? "default"
-                              : "secondary"
-                        }
-                      >
-                        {i.category}
-                      </Badge>
-                      <span className="text-xs text-muted-foreground">Occurred {i.occurrences}×</span>
-                    </div>
-                    <div className="mt-2 text-sm font-medium">{i.content}</div>
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+          </div>
 
-      {/* RECENT TRADES */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Recent Trades</CardTitle>
-          <Button asChild variant="ghost" size="sm">
-            <Link to="/journal">View all in Journal</Link>
-          </Button>
-        </CardHeader>
-        <CardContent>
-          {!tradesQ.data || tradesQ.data.length === 0 ? (
-            <div className="rounded-lg border border-dashed border-border p-10 text-center">
-              <p className="text-sm text-muted-foreground">No trades in validator yet.</p>
-              <Button asChild className="mt-4">
-                <Link to="/trade-creator">Validate your first trade</Link>
-              </Button>
-            </div>
-          ) : (
-            <ul className="divide-y divide-border">
-              {tradesQ.data.map((t) => (
-                <li key={t.trade_id}>
-                  <Link
-                    to="/trade-detail/$id"
-                    params={{ id: t.trade_id }}
-                    className="-mx-2 flex items-center justify-between gap-4 rounded-md px-2 py-3 hover:bg-secondary/40 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <span
-                        className={`inline-block h-2 w-2 rounded-full ${
-                          t.direction === "LONG" ? "bg-emerald-500" : "bg-destructive"
-                        }`}
-                      />
-                      <div>
-                        <div className="font-medium">{t.pair}</div>
-                        <div className="text-xs text-muted-foreground">
-                          {t.direction} · {new Date(t.created_at).toLocaleDateString()}
-                        </div>
+          {/* Sleek Golden Bull Vector / Emblem Graphic */}
+          <div className="hidden xs:flex shrink-0 items-center justify-center h-20 w-20 sm:h-24 sm:w-24 rounded-2xl bg-amber-500/10 border border-amber-500/20 shadow-[0_0_25px_rgba(245,158,11,0.15)]">
+            <svg
+              className="h-12 w-12 sm:h-14 sm:w-14"
+              viewBox="0 0 64 64"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M16 48L24 36L34 42L48 22"
+                stroke="#F59E0B"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <path
+                d="M38 22H48V32"
+                stroke="#FDE68A"
+                strokeWidth="3"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle cx="16" cy="48" r="3" fill="#D97706" />
+              <circle cx="24" cy="36" r="3" fill="#D97706" />
+              <circle cx="34" cy="42" r="3" fill="#D97706" />
+              <circle cx="48" cy="22" r="4" fill="#FDE68A" />
+              {/* Bull horns geometric accent */}
+              <path
+                d="M20 18C16 12 10 14 8 18C12 20 16 22 22 24"
+                stroke="#F59E0B"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+              <path
+                d="M44 18C48 12 54 14 56 18C52 20 48 22 42 24"
+                stroke="#F59E0B"
+                strokeWidth="2"
+                strokeLinecap="round"
+              />
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. PRIMARY ACTION & SECONDARY MODULE CARDS (2x2 GRID) */}
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
+        {/* NEW TRADE */}
+        <Link
+          to="/trade-creator"
+          className="group relative flex flex-col justify-between rounded-xl border border-amber-500/30 bg-card/90 p-4 sm:p-5 transition-all duration-200 hover:border-amber-400 hover:bg-card hover:shadow-[0_4px_20px_rgba(245,158,11,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400 group-hover:scale-105 transition-transform">
+            <Plus className="h-5 w-5" />
+          </div>
+          <div className="mt-4">
+            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
+              New Trade
+            </h3>
+            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
+              Create & run a trade
+            </p>
+          </div>
+        </Link>
+
+        {/* JOURNAL */}
+        <Link
+          to="/journal"
+          className="group relative flex flex-col justify-between rounded-xl border border-border/80 bg-card/70 p-4 sm:p-5 transition-all duration-200 hover:border-border hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-foreground group-hover:scale-105 transition-transform">
+            <BookOpen className="h-4 w-4 text-amber-400" />
+          </div>
+          <div className="mt-4">
+            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
+              Journal
+            </h3>
+            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
+              Review your history
+            </p>
+          </div>
+        </Link>
+
+        {/* STRATEGY PROFILES */}
+        <Link
+          to="/strategy-profiles"
+          className="group relative flex flex-col justify-between rounded-xl border border-border/80 bg-card/70 p-4 sm:p-5 transition-all duration-200 hover:border-border hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-foreground group-hover:scale-105 transition-transform">
+            <Sliders className="h-4 w-4 text-amber-400" />
+          </div>
+          <div className="mt-4">
+            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
+              Strategy Profiles
+            </h3>
+            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
+              Manage strategies
+            </p>
+          </div>
+        </Link>
+
+        {/* TRADE ANALYSIS / AI VALIDATION */}
+        <Link
+          to="/journal"
+          className="group relative flex flex-col justify-between rounded-xl border border-border/80 bg-card/70 p-4 sm:p-5 transition-all duration-200 hover:border-border hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-foreground group-hover:scale-105 transition-transform">
+            <Sparkles className="h-4 w-4 text-amber-400" />
+          </div>
+          <div className="mt-4">
+            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
+              Trade Analysis
+            </h3>
+            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
+              AI insights & validation
+            </p>
+          </div>
+        </Link>
+      </div>
+
+      {/* 4. RECENT TRADES */}
+      <div className="space-y-3 pt-2">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm sm:text-base font-bold tracking-tight text-foreground">
+            Recent Trades
+          </h2>
+          <Link
+            to="/journal"
+            className="text-xs text-amber-400 hover:text-amber-300 font-medium flex items-center gap-0.5"
+          >
+            View all
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+
+        {!tradesQ.data || tradesQ.data.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-border p-8 text-center bg-card/40">
+            <p className="text-sm text-muted-foreground">No trades recorded yet.</p>
+            <Button asChild size="sm" className="mt-3 gold-gradient-btn">
+              <Link to="/trade-creator">Create your first trade</Link>
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {tradesQ.data.slice(0, 5).map((t: any) => {
+              const res = Array.isArray(t.results) ? t.results[0] : t.results;
+              const pnlPct = res?.pnl_percent !== undefined && res?.pnl_percent !== null ? Number(res.pnl_percent) : null;
+              const outcome = res?.outcome || (t.trade_status === "JOURNALED" ? "CLOSED" : t.trade_status);
+              const isWin = outcome === "WIN" || (pnlPct !== null && pnlPct > 0);
+              const isLoss = outcome === "LOSS" || (pnlPct !== null && pnlPct < 0);
+
+              return (
+                <Link
+                  key={t.trade_id}
+                  to="/trade-detail/$id"
+                  params={{ id: t.trade_id }}
+                  className="flex items-center justify-between p-3 sm:p-3.5 rounded-xl border border-border/70 bg-card/60 hover:bg-card hover:border-border transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className={`h-2.5 w-2.5 rounded-full ${
+                        t.direction === "LONG" ? "bg-emerald-500" : "bg-rose-500"
+                      }`}
+                    />
+                    <div>
+                      <div className="text-sm font-semibold text-foreground">
+                        {t.pair} <span className="text-xs text-muted-foreground font-normal">· {t.direction}</span>
+                      </div>
+                      <div className="text-[11px] text-muted-foreground">
+                        {new Date(t.executed_at || t.created_at).toLocaleDateString("en-US", {
+                          month: "short",
+                          day: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}
                       </div>
                     </div>
-                    <span className="rounded-md border border-border bg-secondary px-2 py-0.5 text-xs text-muted-foreground">
-                      {t.trade_status}
-                    </span>
-                  </Link>
-                </li>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    {outcome && (
+                      <span
+                        className={`text-[11px] font-bold px-2 py-0.5 rounded-md ${
+                          isWin
+                            ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                            : isLoss
+                              ? "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+                              : "bg-secondary text-muted-foreground border border-border"
+                        }`}
+                      >
+                        {outcome}
+                      </span>
+                    )}
+
+                    {pnlPct !== null && (
+                      <span
+                        className={`text-xs font-mono font-semibold ${
+                          pnlPct >= 0 ? "text-emerald-400" : "text-rose-400"
+                        }`}
+                      >
+                        {pnlPct >= 0 ? "+" : ""}
+                        {pnlPct.toFixed(1)}%
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* 5. SUMMARY METRICS STRIP */}
+      <div className="space-y-3 pt-4 border-t border-border/60">
+        <h2 className="text-sm font-bold tracking-tight text-foreground">
+          Validation Performance
+        </h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          {stats.map((s) => (
+            <Card key={s.label} className="bg-card/40 border-border/70 p-3">
+              <div className="flex items-center justify-between text-muted-foreground pb-1">
+                <span className="text-[11px] font-medium">{s.label}</span>
+                <s.icon className="h-3.5 w-3.5" />
+              </div>
+              <div className="text-lg font-bold text-foreground font-mono">{s.value}</div>
+            </Card>
+          ))}
+        </div>
+      </div>
+
+      {/* 6. LEARNING INSIGHTS */}
+      {insightsQ.data && insightsQ.data.length > 0 && (
+        <Card className="bg-card/50 border-border/70">
+          <CardHeader className="py-3 px-4">
+            <CardTitle className="text-sm font-semibold flex items-center gap-2">
+              <Sparkles className="h-4 w-4 text-amber-400" />
+              Learning Insights & Rule Discipline
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 pb-4">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {insightsQ.data.map((i) => (
+                <div
+                  key={i.id}
+                  className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 text-xs flex items-center justify-between gap-2"
+                >
+                  <span className="text-foreground font-medium truncate">{i.content}</span>
+                  <Badge
+                    variant={i.category === "MISTAKE" ? "destructive" : "default"}
+                    className="shrink-0 text-[10px]"
+                  >
+                    {i.category} · {i.occurrences}×
+                  </Badge>
+                </div>
               ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }
