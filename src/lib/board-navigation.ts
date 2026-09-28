@@ -1,4 +1,4 @@
-import { Activity, Wallet, Users, UserCircle, type LucideIcon } from "lucide-react";
+import { BarChart3, Wallet, Users, User, type LucideIcon } from "lucide-react";
 
 export interface BoardPlatform {
   id: "validator" | "metafund" | "community" | "profile";
@@ -14,9 +14,9 @@ export const BOARD_PLATFORMS: readonly BoardPlatform[] = [
   {
     id: "validator",
     label: "Meta Validator",
-    shortLabel: "Validator",
+    shortLabel: "Meta Validator",
     to: "/validator",
-    icon: Activity,
+    icon: BarChart3,
     description: "Trading intelligence & multi-timeframe validation platform",
     matchPrefixes: [
       "/validator",
@@ -50,7 +50,7 @@ export const BOARD_PLATFORMS: readonly BoardPlatform[] = [
     label: "Profile",
     shortLabel: "Profile",
     to: "/profile",
-    icon: UserCircle,
+    icon: User,
     description: "Account settings, preferences & administrative access",
     matchPrefixes: ["/profile"],
   },
@@ -60,5 +60,6 @@ export function getActivePlatform(pathname: string): BoardPlatform["id"] {
   if (pathname.startsWith("/metafund")) return "metafund";
   if (pathname.startsWith("/community")) return "community";
   if (pathname.startsWith("/profile")) return "profile";
+  // Default to Meta Validator for /validator, /dashboard, /trade-creator, /journal, /strategy-profiles, /trade-detail, etc.
   return "validator";
 }
