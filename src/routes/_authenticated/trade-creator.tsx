@@ -116,6 +116,8 @@ function TradeCreator() {
         session: parsed.data.session || null,
         day_of_week: form.day_of_week || null,
         notes: parsed.data.notes || null,
+        executed: mode === "run",
+        executed_at: mode === "run" ? new Date().toISOString() : null,
       };
 
       let tradeId: string | null = null;
@@ -171,7 +173,7 @@ function TradeCreator() {
               url: u.path,
               user_label: u.label,
               is_primary: u.is_primary,
-              shot_type: u.shot_type as Database["public"]["Enums"]["screenshot_shot_type"],
+              shot_type: u.shot_type as any,
               analysis_phase: "PRE" as const,
             })),
           );
@@ -355,7 +357,8 @@ function TradeCreator() {
               <Input type="file" multiple accept="image/*" className="mt-4 max-w-xs" onChange={onFileChange} />
             </div>
 
-            {shots.length > 0 && (\n              <div className="grid gap-4 sm:grid-cols-2">
+            {shots.length > 0 && (
+              <div className="grid gap-4 sm:grid-cols-2">
                 {shots.map((s, idx) => (
                   <div key={idx} className="relative overflow-hidden rounded-md border border-border bg-card p-3">
                     <button
