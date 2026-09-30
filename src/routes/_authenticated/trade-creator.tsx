@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
+import type { Database } from "@/integrations/supabase/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -25,147 +26,154 @@ const tradeSchema = z.object({
   account_size: z.coerce.number().positive().optional().nullable(),
   risk_pct: z.coerce.number().min(0.01).max(100).optional().nullable(),
   session: z.string().optional().nullable(),
+  day_of_week: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
 
-type ShotItem = {
+interface UploadedFile {
   file: File;
   previewUrl: string;
   label: string;
-  shot_type: string;
-};
-
-const COMMON_PAIRS = ["EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCAD", "USDCHF", "NZDUSD", "XAUUSD", "BTCUSD", "ETHUSD", "US30", "NAS100", "GER40"];
+  is_primary: boolean;
+  shot_type: "FULL_LAYOUT" | "CHART_ONLY" | "INDICATOR_FOCUS" | "MULTI_TIMEFRAME";
+}
 
 function TradeCreator() {
   const navigate = useNavigate();
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [busy, setBusy] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [activeStep, setActiveStep] = useState<1 | 2>(1);
 
-  const [form, setForm] = useState({
-    pair: "",
-    direction: "LONG" as "LONG" | "SHORT",
-    entry_price: "",
-    stop_loss: "",
-    take_profit: "",
-    account_size: "10000",
-    risk_pct: "1.0",
-    session: "London",
-    day_of_week: new Date().toLocaleDateString("en-US", { weekday: "long" }),
-    notes: "",
-  });
+  // Form State
+  const [pair, setPair] = useState("");
+  const [direction, setDirection] = useState<"LONG" | "SHORT">("LONG");
+  const [entryPrice, setEntryPrice] = useState("");
+  const [stopLoss, setStopLoss] = useState("");
+  const [takeProfit, setTakeProfit] = useState("");
+  const [accountSize, setAccountSize] = useState("10000");
+  const [riskPct, setRiskPct] = useState("1.0");
+  const [session, setSession] = useState("LONDON");
+  const [notes, setNotes] = useState("");
 
-  const [shots, setShots] = useState<ShotItem[]>([]);
+  // Screenshot Uploads State
+  const [uploads, setUploads] = useState<UploadedFile[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
-  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files) return;
     const files = Array.from(e.target.files);
-    const added: ShotItem[] = files.map((f) => ({
-      file: f,
-      previewUrl: URL.createObjectURL(f),
-      label: "",
-      shot_type: "ENTRY",
+    const newUploads: UploadedFile[] = files.map((file, idx) => ({
+      file,
+      previewUrl: URL.createObjectURL(file),
+      label: file.name,
+      is_primary: uploads.length === 0 && idx === 0,
+      shot_type: "FULL_LAYOUT",
     }));
-    setShots((prev) => [...prev, ...added]);
-  }
+    setUploads((prev) => [...prev, ...newUploads]);
+  };
 
-  function removeShot(idx: number) {
-    setShots((prev) => {
-      const copy = [...prev];
-      URL.revokeObjectURL(copy[idx].previewUrl);
-      copy.splice(idx, 1);
-      return copy;
+  const removeUpload = (index: number) => {
+    setUploads((prev) => {
+      const updated = prev.filter((_, idx) => idx !== index);
+      if (updated.length > 0 && !updated.some((u) => u.is_primary)) {
+        updated[0].is_primary = true;
+      }
+      return updated;
     });
-  }
+  };
 
-  async function save(mode: "draft" | "run" = "draft") {
-    const parsed = tradeSchema.safeParse(form);
-    if (!parsed.success) {
-      toast.error(parsed.error.issues[0].message);
-      setStep(1);
-      return;
-    }
-    setBusy(true);
+  const handleCreateTrade = async (mode: "save" | "run") => {
     try {
-      const { data: userRes, error: userErr } = await supabase.auth.getUser();
-      if (userErr || !userRes.user?.id) throw new Error(userErr?.message || "Please sign in to save trades");
-      const userId = userRes.user.id;
+      setIsSubmitting(true);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      // Ensure user record exists in public.users to avoid RLS/FK errors
-      try {
-        await supabase.from("users").upsert({
-          user_id: userId,
-          email: userRes.user.email || null,
-          subscription_tier: "FREE",
-        }, { onConflict: "user_id" });
-      } catch (uErr) {
-        console.warn("User upsert notice:", uErr);
+      if (!user) {
+        toast.error("You must be logged in to create a trade.");
+        setIsSubmitting(false);
+        return;
       }
 
-      const insertPayload: Record<string, any> = {
-        user_id: userId,
-        trade_status: mode === "run" ? ("PRE_ANALYSIS" as const) : ("DRAFT" as const),
-        processing_step: "PENDING" as const,
-        pair: parsed.data.pair.toUpperCase().trim(),
+      // 1. Validate Form Input
+      const parsed = tradeSchema.safeParse({
+        pair: pair.trim().toUpperCase(),
+        direction,
+        entry_price: entryPrice ? Number(entryPrice) : null,
+        stop_loss: stopLoss ? Number(stopLoss) : null,
+        take_profit: takeProfit ? Number(takeProfit) : null,
+        account_size: accountSize ? Number(accountSize) : null,
+        risk_pct: riskPct ? Number(riskPct) : null,
+        session,
+        day_of_week: new Date().toLocaleDateString("en-US", { weekday: "long" }),
+        notes: notes.trim() || null,
+      });
+
+      if (!parsed.success) {
+        toast.error(parsed.error.errors[0].message);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Insert Base Trade Record
+      const tradePayload: any = {
+        user_id: user.id,
+        pair: parsed.data.pair,
         direction: parsed.data.direction,
-        entry_price: parsed.data.entry_price ?? null,
-        stop_loss: parsed.data.stop_loss ?? null,
-        take_profit: parsed.data.take_profit ?? null,
-        account_size: parsed.data.account_size ?? null,
-        risk_pct: parsed.data.risk_pct ?? null,
-        session: parsed.data.session || null,
-        day_of_week: form.day_of_week || null,
-        notes: parsed.data.notes || null,
+        entry_price: parsed.data.entry_price,
+        stop_loss: parsed.data.stop_loss,
+        take_profit: parsed.data.take_profit,
+        account_size: parsed.data.account_size,
+        risk_pct: parsed.data.risk_pct,
+        session: parsed.data.session,
+        day_of_week: parsed.data.day_of_week,
+        notes: parsed.data.notes,
+        trade_status: mode === "run" ? "EXECUTED" : "PLANNED",
         executed: mode === "run",
         executed_at: mode === "run" ? new Date().toISOString() : null,
       };
 
-      let tradeId: string | null = null;
-      const { data: trade, error } = await supabase
+      const { data: tradeData, error: tradeError } = await supabase
         .from("trades")
-        .insert(insertPayload)
+        .insert(tradePayload)
         .select("trade_id")
         .single();
 
-      if (error) {
-        if (error.message?.includes("day_of_week") || error.code === "PGRST204") {
-          delete insertPayload.day_of_week;
-          const { data: fbTrade, error: fbError } = await supabase
-            .from("trades")
-            .insert(insertPayload)
-            .select("trade_id")
-            .single();
-          if (fbError) throw new Error(fbError.message || fbError.details || "Database error saving trade");
-          tradeId = fbTrade.trade_id;
-        } else {
-          throw new Error(error.message || error.details || "Database error saving trade");
-        }
-      } else {
-        tradeId = trade.trade_id;
+      if (tradeError || !tradeData) {
+        throw new Error(tradeError?.message || "Failed to create trade record.");
       }
 
-      if (!tradeId) throw new Error("Failed to create trade record");
+      const tradeId = tradeData.trade_id;
 
-      // Upload screenshots in parallel with try-catch safety
-      if (shots.length > 0) {
-        const uploads = await Promise.all(
-          shots.map(async (shot, idx) => {
-            try {
-              const ext = shot.file.name.split(".").pop() || "png";
-              const path = `${userId}/${tradeId}/${crypto.randomUUID()}.${ext}`;
-              const { error: upErr } = await supabase.storage
-                .from("trade-screenshots")
-                .upload(path, shot.file, { contentType: shot.file.type, upsert: true });
-              if (upErr) console.warn("Screenshot upload warning:", upErr.message);
-              return { path, label: shot.label.trim() || null, is_primary: idx === 0, shot_type: shot.shot_type };
-            } catch (e) {
-              console.warn("Screenshot error:", e);
-              return null;
-            }
-          }),
-        );
+      // 3. Upload Attached Screenshots if any
+      if (uploads.length > 0) {
+        setIsUploading(true);
+        const uploadPromises = uploads.map(async (u) => {
+          const fileExt = u.file.name.split(".").pop();
+          const fileName = `${tradeId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const { error: storageError } = await supabase.storage
+            .from("trade-screenshots")
+            .upload(fileName, u.file);
 
-        const validUploads = uploads.filter((u): u is NonNullable<typeof u> => u !== null && !!u.path);
+          if (storageError) {
+            console.warn(`Failed to upload ${u.file.name}:`, storageError.message);
+            return null;
+          }
+
+          const {
+            data: { publicUrl },
+          } = supabase.storage.from("trade-screenshots").getPublicUrl(fileName);
+
+          return {
+            path: publicUrl,
+            label: u.label,
+            is_primary: u.is_primary,
+            shot_type: u.shot_type,
+          };
+        });
+
+        const uploadedResults = await Promise.all(uploadPromises);
+        const validUploads = uploadedResults.filter(Boolean);
+
         if (validUploads.length > 0) {
           const { error: sErr } = await supabase.from("screenshots").insert(
             validUploads.map((u) => ({
@@ -184,297 +192,358 @@ function TradeCreator() {
       if (mode === "run") {
         // Snapshot eligible MetaFund participations at trade execution time
         try {
-          await supabase.rpc("snapshot_trade_participations", { p_trade_id: tradeId });
-        } catch (snapErr) {
-          console.warn("Participation snapshot notice:", snapErr);
-        }
-
-        // Trigger orchestrate-pipeline edge function immediately
-        try {
-          const { data: { session } } = await supabase.auth.getSession();
-          const rawUrl = import.meta.env.VITE_SUPABASE_URL || "https://jqptprskuxkhfoxsvwcl.supabase.co";
-          const supabaseUrl = rawUrl.includes("qlfauxgzlooqebtpmcte") ? "https://jqptprskuxkhfoxsvwcl.supabase.co" : rawUrl;
-          const apikey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxcHRwcnNrdXhraGZveHN2d2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMzQzOTAsImV4cCI6MjEwMTcxMDM5MH0.uSSUrrH3xWSoqcOcc88LBePB5SGNL_fARHZzAj94cvM") as string;
-          const url = `${supabaseUrl}/functions/v1/orchestrate-pipeline`;
-          const headers: Record<string, string> = {
-            "Content-Type": "application/json",
-            apikey,
-          };
-          if (session?.access_token) {
-            headers["Authorization"] = `Bearer ${session.access_token}`;
-          }
-          const fnRes = await fetch(url, {
-            method: "POST",
-            headers,
-            body: JSON.stringify({ trade_id: tradeId }),
+          await supabase.rpc("snapshot_trade_participations", {
+            p_trade_id: tradeId,
           });
-          if (!fnRes.ok) {
-            const txt = await fnRes.text();
-            console.warn("Pipeline trigger notification:", txt);
-          }
-        } catch (fnErr) {
-          console.warn("Pipeline trigger network error:", fnErr);
+        } catch (snapErr: any) {
+          console.warn("MetaFund trade participation snapshot warning:", snapErr?.message);
         }
-        toast.success("Trade saved — executing AI analysis pipeline");
-      } else {
-        toast.success("Trade saved as draft");
-      }
 
-      navigate({ to: "/trade-detail/$id", params: { id: tradeId } });
-    } catch (err: any) {
-      console.error("Save trade error:", err);
-      let errMsg = err?.message || err?.error_description || err?.details || (typeof err === "string" ? err : String(err));
-      if (errMsg.includes("schema cache") || errMsg.includes("PGRST205") || errMsg.includes("Failed to fetch") || errMsg.includes("fetch failed") || errMsg.includes("NetworkError")) {
-        errMsg = "Database connection or table permission error. Please verify your Supabase connection or table permissions.";
+        toast.success("Trade created and queued for AI Edge Validation.");
+        navigate({ to: "/trade-detail/$id", params: { id: tradeId } });
+      } else {
+        toast.success("Trade plan saved successfully.");
+        navigate({ to: "/validator" });
       }
-      toast.error(errMsg || "Failed to save trade");
+    } catch (err: any) {
+      toast.error(err?.message || "An unexpected error occurred.");
     } finally {
-      setBusy(false);
+      setIsSubmitting(false);
+      setIsUploading(false);
     }
-  }
+  };
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight">New trade</h1>
-        <p className="mt-1 text-sm text-muted-foreground">Step {step} of 3 — saved as DRAFT.</p>
+    <div className="space-y-6 max-w-4xl mx-auto pb-12">
+      {/* 1. HEADER & TOP NAV */}
+      <div className="flex items-center justify-between border-b border-border/80 pb-4">
+        <div>
+          <button
+            type="button"
+            onClick={() => navigate({ to: "/validator" })}
+            className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mb-1.5 transition-colors"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Meta Validator
+          </button>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-sans flex items-center gap-2.5">
+            <Sparkles className="h-6 w-6 text-amber-400" />
+            New Trade Setup
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            Log your trade parameters and chart setups for AI Edge Validation.
+          </p>
+        </div>
       </div>
 
-      <div className="flex gap-2">
-        <div className={`h-1.5 flex-1 rounded-full ${step >= 1 ? "bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-secondary"}`} />
-        <div className={`h-1.5 flex-1 rounded-full ${step >= 2 ? "bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-secondary"}`} />
-        <div className={`h-1.5 flex-1 rounded-full ${step >= 3 ? "bg-amber-400 shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-secondary"}`} />
+      {/* 2. STEP INDICATOR */}
+      <div className="grid grid-cols-2 gap-3 text-xs font-semibold">
+        <button
+          type="button"
+          onClick={() => setActiveStep(1)}
+          className={`p-3 rounded-xl border text-left transition-all ${
+            activeStep === 1
+              ? "border-amber-400/50 bg-secondary/60 text-amber-400 shadow-sm"
+              : "border-border/60 bg-card/40 text-muted-foreground hover:border-border"
+          }`}
+        >
+          <span className="font-mono text-[10px] block opacity-70">STEP 01</span>
+          Trade Parameters & Risk
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveStep(2)}
+          className={`p-3 rounded-xl border text-left transition-all ${
+            activeStep === 2
+              ? "border-amber-400/50 bg-secondary/60 text-amber-400 shadow-sm"
+              : "border-border/60 bg-card/40 text-muted-foreground hover:border-border"
+          }`}
+        >
+          <span className="font-mono text-[10px] block opacity-70">STEP 02</span>
+          Chart Screenshots & Notes
+        </button>
       </div>
 
-      {step === 1 && (
-        <Card>
-          <CardHeader><CardTitle className="text-lg">Trade details</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Ticker / Pair</Label>
-              <Input
-                placeholder="EURUSD, BTCUSD, US30"
-                value={form.pair}
-                onChange={(e) => setForm({ ...form, pair: e.target.value.toUpperCase() })}
-              />
-              <div className="flex flex-wrap gap-1 pt-1">
-                {COMMON_PAIRS.slice(0, 7).map((p) => (
+      {/* 3. FORM BODY */}
+      <Card className="border border-border/80 bg-card/60 backdrop-blur-sm">
+        <CardHeader className="pb-3 border-b border-border/60">
+          <CardTitle className="text-base text-foreground font-bold">
+            {activeStep === 1 ? "1. Setup Specifications & Execution Plan" : "2. Visual Evidence & Strategy Context"}
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="p-5 sm:p-6 space-y-5">
+          {activeStep === 1 && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="pair" className="text-xs font-medium text-foreground">
+                    Pair / Ticker <span className="text-amber-400">*</span>
+                  </Label>
+                  <Input
+                    id="pair"
+                    placeholder="e.g. EURUSD, XAUUSD, BTCUSDT"
+                    value={pair}
+                    onChange={(e) => setPair(e.target.value)}
+                    className="bg-secondary/40 border-border uppercase font-mono focus-visible:ring-amber-400"
+                    autoFocus
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="direction" className="text-xs font-medium text-foreground">
+                    Direction <span className="text-amber-400">*</span>
+                  </Label>
+                  <Select value={direction} onValueChange={(val: any) => setDirection(val)}>
+                    <SelectTrigger id="direction" className="bg-secondary/40 border-border text-foreground">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      <SelectItem value="LONG" className="text-emerald-400 font-bold">LONG (BUY)</SelectItem>
+                      <SelectItem value="SHORT" className="text-rose-400 font-bold">SHORT (SELL)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="entryPrice" className="text-xs font-medium text-foreground">
+                    Entry Price
+                  </Label>
+                  <Input
+                    id="entryPrice"
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 1.08500"
+                    value={entryPrice}
+                    onChange={(e) => setEntryPrice(e.target.value)}
+                    className="bg-secondary/40 border-border font-mono focus-visible:ring-amber-400"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="stopLoss" className="text-xs font-medium text-foreground">
+                    Stop Loss
+                  </Label>
+                  <Input
+                    id="stopLoss"
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 1.08200"
+                    value={stopLoss}
+                    onChange={(e) => setStopLoss(e.target.value)}
+                    className="bg-secondary/40 border-border font-mono focus-visible:ring-amber-400"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="takeProfit" className="text-xs font-medium text-foreground">
+                    Take Profit
+                  </Label>
+                  <Input
+                    id="takeProfit"
+                    type="number"
+                    step="any"
+                    placeholder="e.g. 1.09200"
+                    value={takeProfit}
+                    onChange={(e) => setTakeProfit(e.target.value)}
+                    className="bg-secondary/40 border-border font-mono focus-visible:ring-amber-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-border/40">
+                <div className="space-y-1.5">
+                  <Label htmlFor="accountSize" className="text-xs font-medium text-foreground">
+                    Account Size ($)
+                  </Label>
+                  <Input
+                    id="accountSize"
+                    type="number"
+                    step="any"
+                    value={accountSize}
+                    onChange={(e) => setAccountSize(e.target.value)}
+                    className="bg-secondary/40 border-border font-mono focus-visible:ring-amber-400"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="riskPct" className="text-xs font-medium text-foreground">
+                    Risk Basis (%)
+                  </Label>
+                  <Input
+                    id="riskPct"
+                    type="number"
+                    step="0.1"
+                    value={riskPct}
+                    onChange={(e) => setRiskPct(e.target.value)}
+                    className="bg-secondary/40 border-border font-mono focus-visible:ring-amber-400"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="session" className="text-xs font-medium text-foreground">
+                    Trading Session
+                  </Label>
+                  <Select value={session} onValueChange={(val: any) => setSession(val)}>
+                    <SelectTrigger id="session" className="bg-secondary/40 border-border text-foreground">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border">
+                      <SelectItem value="ASIAN">Asian Session</SelectItem>
+                      <SelectItem value="LONDON">London Session</SelectItem>
+                      <SelectItem value="NEW_YORK">New York Session</SelectItem>
+                      <SelectItem value="OVERLAP">London / NY Overlap</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeStep === 2 && (
+            <div className="space-y-4">
+              {/* SCREENSHOT DROPZONE */}
+              <div className="space-y-2">
+                <Label className="text-xs font-medium text-foreground">
+                  Attach Chart Screenshots (Multi-timeframe / Setup confirmation)
+                </Label>
+                <div className="rounded-xl border-2 border-dashed border-border/80 p-6 text-center hover:border-amber-400/50 transition-colors bg-secondary/20">
+                  <Upload className="h-8 w-8 text-amber-400/80 mx-auto mb-2" />
+                  <p className="text-xs font-semibold text-foreground">
+                    Click to select chart captures or drag & drop files
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">PNG, JPG, WEBP up to 10MB each</p>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*"
+                    onChange={handleFileSelect}
+                    className="hidden"
+                    id="file-upload"
+                  />
                   <Button
-                    key={p}
                     type="button"
                     variant="outline"
                     size="sm"
-                    className="h-7 text-xs"
-                    onClick={() => setForm({ ...form, pair: p })}
+                    className="mt-3 text-xs border-border/80"
+                    onClick={() => document.getElementById("file-upload")?.click()}
                   >
-                    {p}
-                  </Button>
-                ))}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Direction</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    type="button"
-                    variant={form.direction === "LONG" ? "default" : "outline"}
-                    className={form.direction === "LONG" ? "bg-success hover:bg-success/90" : ""}
-                    onClick={() => setForm({ ...form, direction: "LONG" })}
-                  >
-                    LONG
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={form.direction === "SHORT" ? "destructive" : "outline"}
-                    onClick={() => setForm({ ...form, direction: "SHORT" })}
-                  >
-                    SHORT
+                    Select Images
                   </Button>
                 </div>
               </div>
-              <div className="space-y-2">
-                <Label>Session</Label>
-                <Select value={form.session} onValueChange={(v) => setForm({ ...form, session: v })}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Asian">Asian</SelectItem>
-                    <SelectItem value="London">London</SelectItem>
-                    <SelectItem value="New York">New York</SelectItem>
-                    <SelectItem value="Overlap">Overlap</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label>Entry price</Label>
-                <Input type="number" step="any" placeholder="1.0850" value={form.entry_price} onChange={(e) => setForm({ ...form, entry_price: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Stop loss</Label>
-                <Input type="number" step="any" placeholder="1.0820" value={form.stop_loss} onChange={(e) => setForm({ ...form, stop_loss: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Take profit</Label>
-                <Input type="number" step="any" placeholder="1.0920" value={form.take_profit} onChange={(e) => setForm({ ...form, take_profit: e.target.value })} />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Account size ($)</Label>
-                <Input type="number" step="any" value={form.account_size} onChange={(e) => setForm({ ...form, account_size: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Risk %</Label>
-                <Input type="number" step="any" value={form.risk_pct} onChange={(e) => setForm({ ...form, risk_pct: e.target.value })} />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Trade Plan / Confluence Notes</Label>
-              <Textarea rows={3} placeholder="Key zone, HTF bias, news catalyst..." value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
-            </div>
-
-            <div className="flex justify-end pt-2">
-              <Button onClick={() => setStep(2)}>Next: Attach Chart Screenshots</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {step === 2 && (
-        <Card>
-          <CardHeader><CardTitle className="text-lg">Pre-trade chart screenshots</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed border-border p-8 text-center">
-              <Upload className="h-8 w-8 text-muted-foreground" />
-              <p className="mt-2 text-sm font-medium">Upload chart screenshots (Entry, HTF, Setup)</p>
-              <p className="text-xs text-muted-foreground">PNG, JPG or WEBP accepted</p>
-              <Input type="file" multiple accept="image/*" className="mt-4 max-w-xs" onChange={onFileChange} />
-            </div>
-
-            {shots.length > 0 && (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {shots.map((s, idx) => (
-                  <div key={idx} className="relative overflow-hidden rounded-md border border-border bg-card p-3">
-                    <button
-                      type="button"
-                      className="absolute right-2 top-2 rounded-full bg-background/80 p-1 hover:bg-background"
-                      onClick={() => removeShot(idx)}
+              {/* UPLOAD PREVIEWS */}
+              {uploads.length > 0 && (
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2">
+                  {uploads.map((u, idx) => (
+                    <div
+                      key={idx}
+                      className="relative rounded-lg border border-border/80 overflow-hidden bg-card/90 group"
                     >
-                      <X className="h-4 w-4" />
-                    </button>
-                    <img src={s.previewUrl} alt="Chart preview" className="h-36 w-full rounded object-cover" />
-                    <div className="mt-3 grid grid-cols-2 gap-2">
-                      <Select
-                        value={s.shot_type}
-                        onValueChange={(v) => {
-                          const copy = [...shots];
-                          copy[idx].shot_type = v;
-                          setShots(copy);
-                        }}
-                      >
-                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ENTRY">Entry Chart</SelectItem>
-                          <SelectItem value="HTF">HTF Context</SelectItem>
-                          <SelectItem value="SETUP">Pattern Setup</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        className="h-8 text-xs"
-                        placeholder="Label / Timeframe"
-                        value={s.label}
-                        onChange={(e) => {
-                          const copy = [...shots];
-                          copy[idx].label = e.target.value;
-                          setShots(copy);
-                        }}
+                      <img
+                        src={u.previewUrl}
+                        alt={u.label}
+                        className="h-28 w-full object-cover"
                       />
+                      <button
+                        type="button"
+                        onClick={() => removeUpload(idx)}
+                        className="absolute top-1.5 right-1.5 h-6 w-6 rounded-full bg-background/80 text-foreground flex items-center justify-center hover:bg-rose-500 hover:text-white transition-colors"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                      <div className="p-2 text-[10px] space-y-1">
+                        <div className="truncate font-semibold text-foreground">{u.label}</div>
+                        <div className="flex items-center justify-between text-muted-foreground font-mono">
+                          <span>{u.shot_type}</span>
+                          {u.is_primary && (
+                            <span className="text-amber-400 font-bold">PRIMARY</span>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )}
+
+              {/* NOTES */}
+              <div className="space-y-1.5 pt-2 border-t border-border/40">
+                <Label htmlFor="notes" className="text-xs font-medium text-foreground">
+                  Pre-Trade Setup Logic & Market Narrative
+                </Label>
+                <Textarea
+                  id="notes"
+                  placeholder="e.g. 4H liquidity swept below Asia low, MSS on 15m with displacement, entering on FVG retest..."
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  rows={4}
+                  className="bg-secondary/40 border-border text-xs leading-relaxed focus-visible:ring-amber-400"
+                />
               </div>
+            </div>
+          )}
+
+          {/* ACTIONS */}
+          <div className="flex items-center justify-between pt-4 border-t border-border/60">
+            {activeStep === 2 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setActiveStep(1)}
+                className="text-xs"
+              >
+                ← Back to Parameters
+              </Button>
+            ) : (
+              <div />
             )}
 
-            <div className="flex justify-between pt-2">
-              <Button variant="outline" onClick={() => setStep(1)}><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
-              <Button onClick={() => setStep(3)}>Next: Review & Save</Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {step === 3 && (
-        <Card>
-          <CardHeader><CardTitle className="text-lg">Review trade plan</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            <div className="rounded-md border border-border bg-secondary/20 p-4 space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Pair</span>
-                <span className="font-semibold">{form.pair || "EURUSD"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Direction</span>
-                <span className={`font-semibold ${form.direction === "LONG" ? "text-success" : "text-destructive"}`}>{form.direction}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Entry / SL / TP</span>
-                <span className="font-medium">{form.entry_price || "—"} / {form.stop_loss || "—"} / {form.take_profit || "—"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Account / Risk</span>
-                <span className="font-medium">${form.account_size} · {form.risk_pct}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Session</span>
-                <span className="font-medium">{form.session}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Day</span>
-                <span className="font-medium">{form.day_of_week}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Screenshots</span>
-                <span className="font-medium">{shots.length} attached</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Status</span>
-                <span className="font-semibold text-primary">DRAFT</span>
-              </div>
-            </div>
-
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-border/50">
-              <Button variant="outline" onClick={() => setStep(2)}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back
-              </Button>
-              <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              {activeStep === 1 ? (
                 <Button
                   type="button"
-                  variant="outline"
-                  onClick={() => save("draft")}
-                  disabled={busy}
+                  size="sm"
+                  onClick={() => {
+                    if (!pair.trim()) {
+                      toast.error("Please provide a currency pair / ticker.");
+                      return;
+                    }
+                    setActiveStep(2);
+                  }}
+                  className="gold-gradient-btn text-xs font-semibold px-4"
                 >
-                  {busy ? "Saving..." : "Save Draft"}
+                  Continue to Screenshots →
                 </Button>
-                <Button
-                  type="button"
-                  onClick={() => save("run")}
-                  disabled={busy}
-                  className="gold-gradient-btn font-semibold"
-                >
-                  <Sparkles className="mr-2 h-4 w-4" />
-                  {busy ? "Executing..." : "SAVE & RUN"}
-                </Button>
-              </div>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={isSubmitting || isUploading}
+                    onClick={() => handleCreateTrade("save")}
+                    className="text-xs border-border/80 text-muted-foreground hover:text-foreground"
+                  >
+                    Save as Plan
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    disabled={isSubmitting || isUploading}
+                    onClick={() => handleCreateTrade("run")}
+                    className="gold-gradient-btn text-xs font-semibold px-4 shadow-[0_2px_12px_rgba(245,158,11,0.2)]"
+                  >
+                    <Sparkles className="h-3.5 w-3.5 mr-1.5" />
+                    {isSubmitting ? "Validating Setup..." : "Save & Run AI Validation"}
+                  </Button>
+                </>
+              )}
             </div>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
