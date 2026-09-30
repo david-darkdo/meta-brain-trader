@@ -5,6 +5,8 @@ import {
   fetchInvestorSummary,
   fetchInvestorTradeHistory,
   fetchInvestorWithdrawalRequests,
+  fetchInvestorCapitalEvents,
+  requestInvestorDeposit,
   requestInvestorWithdrawal,
   type InvestorTradeHistoryRow,
 } from "@/lib/metafund-api";
@@ -25,6 +27,7 @@ import {
 } from "@/components/ui/dialog";
 import {
   ArrowUpRight,
+  ArrowDownLeft,
   Clock,
   CheckCircle2,
   AlertCircle,
@@ -35,6 +38,9 @@ import {
   TrendingUp,
   ChevronRight,
   ShieldCheck,
+  Bell,
+  Info,
+  DollarSign,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -45,10 +51,18 @@ export const Route = createFileRoute("/_authenticated/metafund")({
 
 function InvestorMetaFundDashboard() {
   const qc = useQueryClient();
-  const [activeTab, setActiveTab] = useState<"trades" | "withdrawals" | "capital">("trades");
+  const [activeTab, setActiveTab] = useState<"overview" | "trades" | "capital" | "withdrawals" | "notifications">("overview");
+
+  // State for Deposit Modal
+  const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
+  const [depositAmount, setDepositAmount] = useState("");
+  const [depositCurrency, setDepositCurrency] = useState("USD");
+  const [depositNotes, setDepositNotes] = useState("");
+
+  // State for Withdrawal Modal
+  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
   const [withdrawalNotes, setWithdrawalNotes] = useState("");
-  const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
 
   // 1. Fetch Investor Financial Summary
   const summaryQ = useQuery({
@@ -56,36 +70,75 @@ function InvestorMetaFundDashboard() {
     queryFn: fetchInvestorSummary,
   });
 
+  const investorId = summaryQ.data?.investor_id || null;
+  const isAccountOnboarded = !!investorId;
+
   // 2. Fetch Investor Trade Participation History
   const tradeHistoryQ = useQuery({
     queryKey: ["investor", "trade_history"],
-    queryFn: fetchInvestorTradeHistory,
+    queryFn: () => (investorId ? fetchInvestorTradeHistory() : Promise.resolve([])),
+    enabled: isAccountOnboarded,
   });
 
   // 3. Fetch Investor Withdrawal Requests
   const withdrawalsQ = useQuery({
-    queryKey: ["investor", "withdrawals", summaryQ.data?.investor_id],
-    queryFn: () =>
-      summaryQ.data?.investor_id
-        ? fetchInvestorWithdrawalRequests(summaryQ.data.investor_id)
-        : Promise.resolve([]),
-    enabled: !!summaryQ.data?.investor_id,
+    queryKey: ["investor", "withdrawals", investorId],
+    queryFn: () => (investorId ? fetchInvestorWithdrawalRequests(investorId) : Promise.resolve([])),
+    enabled: isAccountOnboarded,
   });
 
-  // 4. Withdrawal Request Mutation
+  // 4. Fetch Investor Capital Events (Deposits)
+  const capitalEventsQ = useQuery({
+    queryKey: ["investor", "capital_events", investorId],
+    queryFn: () => (investorId ? fetchInvestorCapitalEvents(investorId) : Promise.resolve([])),
+    enabled: isAccountOnboarded,
+  });
+
+  // 5. Deposit Request Mutation
+  const requestDepositMutation = useMutation({
+    mutationFn: async () => {
+      if (!investorId) {
+        throw new Error("Your investor account is not yet activated. Contact administration for onboarding.");
+      }
+      const amt = Number(depositAmount);
+      if (isNaN(amt) || amt <= 0) {
+        throw new Error("Please enter a valid positive deposit amount.");
+      }
+
+      return requestInvestorDeposit({
+        accountId: investorId,
+        amount: amt,
+        currency: depositCurrency,
+        notes: depositNotes || undefined,
+      });
+    },
+    onSuccess: () => {
+      toast.success("Deposit request submitted. Awaiting administrative confirmation.");
+      setIsDepositModalOpen(false);
+      setDepositAmount("");
+      setDepositNotes("");
+      qc.invalidateQueries({ queryKey: ["investor"] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Failed to submit deposit request.");
+    },
+  });
+
+  // 6. Withdrawal Request Mutation
   const requestWithdrawalMutation = useMutation({
     mutationFn: async () => {
-      if (!summaryQ.data?.investor_id) throw new Error("No active investor account found.");
+      if (!investorId) throw new Error("No active investor account found.");
       const amt = Number(withdrawalAmount);
       if (isNaN(amt) || amt <= 0) throw new Error("Please enter a valid positive withdrawal amount.");
-      if (amt > (summaryQ.data.available_capital ?? 0)) {
+      const availableCap = Number(summaryQ.data?.available_capital ?? 0);
+      if (amt > availableCap) {
         throw new Error(
-          `Requested amount ($${amt}) exceeds available capital ($${summaryQ.data.available_capital ?? 0}).`
+          `Requested amount ($${amt}) exceeds available capital ($${availableCap.toFixed(2)}).`
         );
       }
 
       return requestInvestorWithdrawal({
-        accountId: summaryQ.data.investor_id,
+        accountId: investorId,
         amount: amt,
         notes: withdrawalNotes || undefined,
       });
@@ -109,7 +162,7 @@ function InvestorMetaFundDashboard() {
     return (
       <div className="flex h-96 items-center justify-center space-x-2">
         <RefreshCw className="h-6 w-6 animate-spin text-amber-400" />
-        <span className="text-muted-foreground text-sm">Loading MetaFund investor position...</span>
+        <span className="text-muted-foreground text-sm">Loading MetaFund investment platform...</span>
       </div>
     );
   }
@@ -136,48 +189,40 @@ function InvestorMetaFundDashboard() {
     );
   }
 
-  // Empty / No Account State
-  if (!s || !s.investor_id) {
-    return (
-      <div className="mx-auto max-w-xl text-center py-16 px-4 space-y-6">
-        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.12)]">
-          <ShieldCheck className="h-8 w-8" />
-        </div>
-        <div className="space-y-2">
-          <div className="text-xs font-semibold uppercase tracking-wider text-amber-400">
-            MetaFund
-          </div>
-          <h2 className="text-2xl font-bold tracking-tight text-foreground">
-            Investor access not activated.
-          </h2>
-          <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
-            Your MetaFund investor account has not yet been onboarded.
-          </p>
-          <p className="text-xs text-muted-foreground/80 max-w-md mx-auto leading-relaxed pt-1">
-            If you are an authorized company administrator, complete investor onboarding from{" "}
-            <span className="text-foreground font-medium">Company Command Center</span>.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const equity = Number(s.current_economic_equity ?? 0);
-  const available = Number(s.available_capital ?? 0);
-  const committed = Number(s.active_committed_capital ?? 0);
-  const pnl = Number(s.realized_trading_pnl ?? 0);
-  const deposited = Number(s.cumulative_deposited ?? 0);
-  const withdrawn = Number(s.cumulative_withdrawn ?? 0);
+  // Financial Values (Safe fallback to 0.00 for State A and State B)
+  const equity = Number(s?.current_economic_equity ?? 0);
+  const available = Number(s?.available_capital ?? 0);
+  const committed = Number(s?.active_committed_capital ?? 0);
+  const pnl = Number(s?.realized_trading_pnl ?? 0);
+  const deposited = Number(s?.cumulative_deposited ?? 0);
+  const withdrawn = Number(s?.cumulative_withdrawn ?? 0);
   const pnlPct = deposited > 0 ? (pnl / deposited) * 100 : 0;
+  const hasCapital = equity > 0 || deposited > 0;
 
   return (
     <div className="space-y-6">
-      {/* 1. PLATFORM TITLE */}
+      {/* 1. PLATFORM HEADER & USER ACTIONS */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-sans">
-            MetaFund
-          </h1>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-sans">
+              MetaFund
+            </h1>
+            <Badge
+              variant={isAccountOnboarded ? "default" : "outline"}
+              className={`text-[10px] uppercase font-mono tracking-wider ${
+                isAccountOnboarded
+                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
+                  : "text-muted-foreground border-border"
+              }`}
+            >
+              {!isAccountOnboarded
+                ? "Not Onboarded"
+                : !hasCapital
+                  ? "Active Investor · Awaiting Deposit"
+                  : "Active Investor"}
+            </Badge>
+          </div>
           <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
             Your Capital. Our Discipline. Shared Growth.
           </p>
@@ -193,10 +238,101 @@ function InvestorMetaFundDashboard() {
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
           </Button>
 
+          {/* DEPOSIT DIALOG */}
+          <Dialog open={isDepositModalOpen} onOpenChange={setIsDepositModalOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gold-gradient-btn text-xs h-8">
+                <ArrowDownLeft className="h-3.5 w-3.5 mr-1" /> Deposit
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="text-foreground">Deposit Capital into MetaFund</DialogTitle>
+                <DialogDescription>
+                  Submit a deposit request. Capital will be activated upon administrative confirmation.
+                </DialogDescription>
+              </DialogHeader>
+
+              {!isAccountOnboarded ? (
+                <div className="py-4 text-center space-y-2">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-400">
+                    <Info className="h-6 w-6" />
+                  </div>
+                  <h4 className="text-sm font-semibold text-foreground">Onboarding Required</h4>
+                  <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                    Your account has not yet been activated for investment operations. Investment functionality becomes active after administrative onboarding.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-4 py-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="deposit-amount" className="text-xs text-muted-foreground">Amount</Label>
+                      <Input
+                        id="deposit-amount"
+                        type="number"
+                        step="any"
+                        placeholder="e.g. 5000"
+                        value={depositAmount}
+                        onChange={(e) => setDepositAmount(e.target.value)}
+                        className="bg-secondary/50 border-border focus-visible:ring-amber-400"
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="deposit-currency" className="text-xs text-muted-foreground">Currency</Label>
+                      <select
+                        id="deposit-currency"
+                        className="w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm text-foreground focus-visible:ring-1 focus-visible:ring-amber-400"
+                        value={depositCurrency}
+                        onChange={(e) => setDepositCurrency(e.target.value)}
+                      >
+                        <option value="USD">USD ($)</option>
+                        <option value="EUR">EUR (€)</option>
+                        <option value="GBP">GBP (£)</option>
+                        <option value="NGN">NGN (₦)</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="deposit-notes" className="text-xs text-muted-foreground">Reference / Transaction Note (Optional)</Label>
+                    <Input
+                      id="deposit-notes"
+                      placeholder="e.g. Wire transfer / Bank deposit ref"
+                      value={depositNotes}
+                      onChange={(e) => setDepositNotes(e.target.value)}
+                      className="bg-secondary/50 border-border focus-visible:ring-amber-400"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsDepositModalOpen(false)}>
+                  Cancel
+                </Button>
+                {isAccountOnboarded && (
+                  <Button
+                    className="gold-gradient-btn"
+                    disabled={requestDepositMutation.isPending || !depositAmount}
+                    onClick={() => requestDepositMutation.mutate()}
+                  >
+                    {requestDepositMutation.isPending ? "Submitting..." : "Submit Deposit Request"}
+                  </Button>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* WITHDRAWAL DIALOG */}
           <Dialog open={isWithdrawModalOpen} onOpenChange={setIsWithdrawModalOpen}>
             <DialogTrigger asChild>
-              <Button size="sm" disabled={available <= 0} className="gold-gradient-btn text-xs h-8">
-                <ArrowUpRight className="h-3.5 w-3.5 mr-1" /> Request Withdrawal
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={!isAccountOnboarded || available <= 0}
+                className="border-border/80 bg-secondary/40 text-xs h-8 text-foreground"
+              >
+                <ArrowUpRight className="h-3.5 w-3.5 mr-1" /> Withdraw
               </Button>
             </DialogTrigger>
             <DialogContent className="sm:max-w-md bg-card border-border">
@@ -204,7 +340,7 @@ function InvestorMetaFundDashboard() {
                 <DialogTitle className="text-foreground">Request Capital Withdrawal</DialogTitle>
                 <DialogDescription>
                   Available uncommitted balance:{" "}
-                  <span className="font-semibold text-amber-400">
+                  <span className="font-semibold text-amber-400 font-mono">
                     ${available.toLocaleString("en-US", { minimumFractionDigits: 2 })} USD
                   </span>
                 </DialogDescription>
@@ -226,7 +362,7 @@ function InvestorMetaFundDashboard() {
                   <Label htmlFor="notes" className="text-xs text-muted-foreground">Payout Instructions / Destination</Label>
                   <Input
                     id="notes"
-                    placeholder="e.g. USDT TRC20 / Bank account"
+                    placeholder="e.g. USDT TRC20 / Bank account details"
                     value={withdrawalNotes}
                     onChange={(e) => setWithdrawalNotes(e.target.value)}
                     className="bg-secondary/50 border-border focus-visible:ring-amber-400"
@@ -250,23 +386,79 @@ function InvestorMetaFundDashboard() {
         </div>
       </div>
 
-      {/* 2. HERO TOTAL ECONOMIC EQUITY CARD */}
+      {/* 2. NON-BLOCKING ACCOUNT STATE BANNER (For State A & State B) */}
+      {!isAccountOnboarded ? (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+              <ShieldCheck className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider">
+                Investor Account Status: Not Yet Activated
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Your MetaFund dashboard is ready. Full investment functionality becomes active after onboarding.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setIsDepositModalOpen(true)}
+            className="text-xs border-amber-500/30 text-amber-400 shrink-0"
+          >
+            Learn More
+          </Button>
+        </div>
+      ) : !hasCapital ? (
+        <div className="rounded-xl border border-border bg-card/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-emerald-400 border border-emerald-500/20">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                Investor Account: Active · Account #{s?.account_number || "—"}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Your investor profile is active with $0.00 allocated capital. Make your first deposit to participate in trading cycles.
+              </p>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            onClick={() => setIsDepositModalOpen(true)}
+            className="gold-gradient-btn text-xs shrink-0"
+          >
+            <ArrowDownLeft className="h-3.5 w-3.5 mr-1" /> Deposit Capital
+          </Button>
+        </div>
+      ) : null}
+
+      {/* 3. HERO TOTAL ECONOMIC EQUITY CARD */}
       <div className="relative overflow-hidden rounded-2xl gold-card-hero p-5 sm:p-7">
         <div className="flex flex-col space-y-4">
           <div className="flex items-center justify-between">
             <span className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
               Total Economic Equity
             </span>
-            <span
-              className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                pnl >= 0
-                  ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
-                  : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
-              }`}
-            >
-              {pnl >= 0 ? "+" : ""}
-              {pnlPct.toFixed(2)}%
-            </span>
+            {hasCapital ? (
+              <span
+                className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                  pnl >= 0
+                    ? "bg-emerald-500/15 text-emerald-400 border border-emerald-500/30"
+                    : "bg-rose-500/15 text-rose-400 border border-rose-500/30"
+                }`}
+              >
+                {pnl >= 0 ? "+" : ""}
+                {pnlPct.toFixed(2)}%
+              </span>
+            ) : (
+              <span className="text-xs text-muted-foreground font-mono">
+                No investment performance yet
+              </span>
+            )}
           </div>
 
           <div>
@@ -281,7 +473,7 @@ function InvestorMetaFundDashboard() {
             <div>
               <div className="text-xs text-muted-foreground">Invested</div>
               <div className="text-sm sm:text-base font-bold text-foreground font-mono mt-0.5">
-                ${deposited.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+                ${deposited.toLocaleString("en-US", { minimumFractionDigits: 2 })}
               </div>
             </div>
 
@@ -292,64 +484,87 @@ function InvestorMetaFundDashboard() {
                   pnl >= 0 ? "text-emerald-400" : "text-rose-400"
                 }`}
               >
-                {pnl >= 0 ? "+" : ""}${pnl.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+                {pnl >= 0 ? "+" : ""}${pnl.toLocaleString("en-US", { minimumFractionDigits: 2 })}
               </div>
             </div>
 
             <div>
               <div className="text-xs text-muted-foreground">Available</div>
               <div className="text-sm sm:text-base font-bold text-amber-400 font-mono mt-0.5">
-                ${available.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+                ${available.toLocaleString("en-US", { minimumFractionDigits: 2 })}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* 3. PRIMARY 4 NAVIGATION CARDS (2x2 GRID) */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        {/* MY PARTICIPATIONS */}
+      {/* 4. PRIMARY NAVIGATION CARDS (2x2 GRID) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* OVERVIEW */}
         <button
           type="button"
-          onClick={() => setActiveTab("trades")}
-          className={`group flex flex-col justify-between rounded-xl border p-4 sm:p-5 text-left transition-all ${
-            activeTab === "trades"
+          onClick={() => setActiveTab("overview")}
+          className={`group flex flex-col justify-between rounded-xl border p-4 text-left transition-all ${
+            activeTab === "overview"
               ? "border-amber-400/50 bg-card shadow-[0_4px_20px_rgba(245,158,11,0.1)]"
               : "border-border/80 bg-card/60 hover:bg-card hover:border-border"
           }`}
         >
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400 group-hover:scale-105 transition-transform">
-            <Layers className="h-5 w-5" />
+            <TrendingUp className="h-4 w-4" />
           </div>
           <div className="mt-4">
-            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
-              My Participations
+            <h3 className="text-sm font-semibold text-foreground group-hover:text-amber-400 transition-colors">
+              Overview
             </h3>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              {s.open_trades_count ?? 0} active · ${committed.toLocaleString("en-US", { minimumFractionDigits: 0 })} committed
+              ${equity.toLocaleString("en-US", { minimumFractionDigits: 0 })} total equity
             </p>
           </div>
         </button>
 
-        {/* INVESTMENT CYCLES */}
+        {/* MY PARTICIPATIONS */}
+        <button
+          type="button"
+          onClick={() => setActiveTab("trades")}
+          className={`group flex flex-col justify-between rounded-xl border p-4 text-left transition-all ${
+            activeTab === "trades"
+              ? "border-amber-400/50 bg-card shadow-[0_4px_20px_rgba(245,158,11,0.1)]"
+              : "border-border/80 bg-card/60 hover:bg-card hover:border-border"
+          }`}
+        >
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-amber-400 group-hover:scale-105 transition-transform">
+            <Layers className="h-4 w-4" />
+          </div>
+          <div className="mt-4">
+            <h3 className="text-sm font-semibold text-foreground group-hover:text-amber-400 transition-colors">
+              Participations
+            </h3>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {s?.open_trades_count ?? 0} active · ${committed.toLocaleString("en-US", { minimumFractionDigits: 0 })} committed
+            </p>
+          </div>
+        </button>
+
+        {/* CAPITAL FLOW */}
         <button
           type="button"
           onClick={() => setActiveTab("capital")}
-          className={`group flex flex-col justify-between rounded-xl border p-4 sm:p-5 text-left transition-all ${
+          className={`group flex flex-col justify-between rounded-xl border p-4 text-left transition-all ${
             activeTab === "capital"
               ? "border-amber-400/50 bg-card shadow-[0_4px_20px_rgba(245,158,11,0.1)]"
               : "border-border/80 bg-card/60 hover:bg-card hover:border-border"
           }`}
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-foreground group-hover:scale-105 transition-transform">
-            <Calendar className="h-4 w-4 text-amber-400" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-amber-400 group-hover:scale-105 transition-transform">
+            <Calendar className="h-4 w-4" />
           </div>
           <div className="mt-4">
-            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
-              Investment Cycles
+            <h3 className="text-sm font-semibold text-foreground group-hover:text-amber-400 transition-colors">
+              Capital Flow
             </h3>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              70% / 30% standard profit split
+              ${deposited.toLocaleString("en-US", { minimumFractionDigits: 0 })} deposited
             </p>
           </div>
         </button>
@@ -358,69 +573,122 @@ function InvestorMetaFundDashboard() {
         <button
           type="button"
           onClick={() => setActiveTab("withdrawals")}
-          className={`group flex flex-col justify-between rounded-xl border p-4 sm:p-5 text-left transition-all ${
+          className={`group flex flex-col justify-between rounded-xl border p-4 text-left transition-all ${
             activeTab === "withdrawals"
               ? "border-amber-400/50 bg-card shadow-[0_4px_20px_rgba(245,158,11,0.1)]"
               : "border-border/80 bg-card/60 hover:bg-card hover:border-border"
           }`}
         >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-foreground group-hover:scale-105 transition-transform">
-            <Wallet className="h-4 w-4 text-amber-400" />
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-amber-400 group-hover:scale-105 transition-transform">
+            <Wallet className="h-4 w-4" />
           </div>
           <div className="mt-4">
-            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
+            <h3 className="text-sm font-semibold text-foreground group-hover:text-amber-400 transition-colors">
               Withdrawals
             </h3>
             <p className="text-[11px] text-muted-foreground mt-0.5">
-              ${available.toLocaleString("en-US", { minimumFractionDigits: 0 })} withdrawable cash
-            </p>
-          </div>
-        </button>
-
-        {/* PERFORMANCE */}
-        <button
-          type="button"
-          onClick={() => setActiveTab("capital")}
-          className="group flex flex-col justify-between rounded-xl border border-border/80 bg-card/60 p-4 sm:p-5 text-left transition-all hover:bg-card hover:border-border"
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-foreground group-hover:scale-105 transition-transform">
-            <TrendingUp className="h-4 w-4 text-amber-400" />
-          </div>
-          <div className="mt-4">
-            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
-              Performance
-            </h3>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {s.closed_trades_count ?? 0} settled trades
+              ${available.toLocaleString("en-US", { minimumFractionDigits: 0 })} available
             </p>
           </div>
         </button>
       </div>
 
-      {/* 4. RECENT ACTIVITY & DETAILED TABS */}
+      {/* 5. DETAILED TABS SECTION */}
       <div className="space-y-4 pt-2">
         <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="space-y-4">
           <div className="flex items-center justify-between border-b border-border/70 pb-2">
             <TabsList className="bg-secondary/40 border border-border/60">
+              <TabsTrigger value="overview" className="text-xs data-[state=active]:text-amber-400">
+                Overview
+              </TabsTrigger>
               <TabsTrigger value="trades" className="text-xs data-[state=active]:text-amber-400">
                 Participations
-              </TabsTrigger>
-              <TabsTrigger value="withdrawals" className="text-xs data-[state=active]:text-amber-400">
-                Withdrawals
               </TabsTrigger>
               <TabsTrigger value="capital" className="text-xs data-[state=active]:text-amber-400">
                 Capital Flow
               </TabsTrigger>
+              <TabsTrigger value="withdrawals" className="text-xs data-[state=active]:text-amber-400">
+                Withdrawals
+              </TabsTrigger>
+              <TabsTrigger value="notifications" className="text-xs data-[state=active]:text-amber-400">
+                Updates
+              </TabsTrigger>
             </TabsList>
           </div>
+
+          {/* OVERVIEW TAB */}
+          <TabsContent value="overview" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="bg-card/60 border-border/70">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-amber-400" /> Capital Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-xs">
+                  <div className="flex justify-between border-b border-border/60 py-1.5">
+                    <span className="text-muted-foreground">Total Economic Equity</span>
+                    <span className="font-mono font-bold text-foreground">${equity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/60 py-1.5">
+                    <span className="text-muted-foreground">Active Committed Capital</span>
+                    <span className="font-mono font-semibold text-amber-400">${committed.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5">
+                    <span className="text-muted-foreground">Available Liquidity</span>
+                    <span className="font-mono font-semibold text-emerald-400">${available.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/60 border-border/70">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <Calendar className="h-4 w-4 text-amber-400" /> Investment Terms
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-xs text-muted-foreground leading-relaxed">
+                  <p>• <span className="text-foreground font-semibold">70% Investor / 30% Company</span> profit split on positive closed trades.</p>
+                  <p>• <span className="text-foreground font-semibold">100% loss absorption</span> by capital pool with $0 company fee on loss trades.</p>
+                  <p>• Idempotent execution-time snapshot allocation.</p>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/60 border-border/70">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-bold flex items-center gap-2">
+                    <Bell className="h-4 w-4 text-amber-400" /> Operations
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2 text-xs">
+                  <p className="text-muted-foreground">
+                    Status: <span className="text-foreground font-medium">{isAccountOnboarded ? "ACTIVE" : "PENDING ONBOARDING"}</span>
+                  </p>
+                  <p className="text-muted-foreground">
+                    Account: <span className="text-foreground font-mono">{s?.account_number || "—"}</span>
+                  </p>
+                  <div className="pt-1 flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => setIsDepositModalOpen(true)}
+                      className="gold-gradient-btn text-xs h-7 w-full"
+                    >
+                      Deposit
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
 
           {/* PARTICIPATIONS TAB */}
           <TabsContent value="trades" className="space-y-3">
             {!tradeHistoryQ.data || tradeHistoryQ.data.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border p-10 text-center bg-card/40">
+                <Layers className="h-8 w-8 text-muted-foreground/60 mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground font-medium">No Trade Participations Recorded</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  When trades are executed in Meta Validator, your participating capital snapshot will appear here.
+                  When trades are validated and executed in Meta Validator, your participating capital snapshot will appear here.
                 </p>
               </div>
             ) : (
@@ -471,13 +739,100 @@ function InvestorMetaFundDashboard() {
             )}
           </TabsContent>
 
+          {/* CAPITAL FLOW TAB */}
+          <TabsContent value="capital" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-bold text-foreground">Capital Flow & Deposits</h3>
+                <p className="text-xs text-muted-foreground">Authoritative deposit request history and capital allocations.</p>
+              </div>
+              <Button size="sm" onClick={() => setIsDepositModalOpen(true)} className="gold-gradient-btn text-xs h-8">
+                <ArrowDownLeft className="h-3.5 w-3.5 mr-1" /> New Deposit
+              </Button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="bg-card/60 border-border/70">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-bold">Capital Position Summary</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2.5 text-xs">
+                  <div className="flex justify-between border-b border-border/60 py-1.5">
+                    <span className="text-muted-foreground">Cumulative Deposited</span>
+                    <span className="font-mono font-semibold">${deposited.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/60 py-1.5">
+                    <span className="text-muted-foreground">Cumulative Withdrawn</span>
+                    <span className="font-mono font-semibold">${withdrawn.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-border/60 py-1.5">
+                    <span className="text-muted-foreground">Net Contributed</span>
+                    <span className="font-mono font-semibold">${(deposited - withdrawn).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                  <div className="flex justify-between py-1.5">
+                    <span className="text-muted-foreground">Total Economic Equity</span>
+                    <span className="font-mono font-bold text-amber-400">${equity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="bg-card/60 border-border/70">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-bold">Deposit Requests & Capital Events</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  {!capitalEventsQ.data || capitalEventsQ.data.length === 0 ? (
+                    <p className="text-xs text-muted-foreground py-4 text-center">No deposit events recorded yet.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                      {capitalEventsQ.data.map((ce: any) => (
+                        <div key={ce.id} className="flex justify-between items-center text-xs p-2 rounded-lg border border-border/60 bg-secondary/30">
+                          <div>
+                            <div className="font-mono font-bold text-foreground">
+                              ${Number(ce.base_amount_usd || ce.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {ce.currency}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground">
+                              {new Date(ce.created_at).toLocaleDateString()} · {ce.event_type}
+                            </div>
+                          </div>
+                          <Badge
+                            variant={ce.status === "ACTIVATED" ? "default" : ce.status === "PENDING" ? "outline" : "secondary"}
+                            className="text-[10px]"
+                          >
+                            {ce.status}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
           {/* WITHDRAWALS TAB */}
-          <TabsContent value="withdrawals" className="space-y-3">
+          <TabsContent value="withdrawals" className="space-y-4">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="text-sm font-bold text-foreground">Withdrawal Requests</h3>
+                <p className="text-xs text-muted-foreground">Governed review, approval, and settlement payouts.</p>
+              </div>
+              <Button
+                size="sm"
+                onClick={() => setIsWithdrawModalOpen(true)}
+                disabled={!isAccountOnboarded || available <= 0}
+                className="gold-gradient-btn text-xs h-8"
+              >
+                <ArrowUpRight className="h-3.5 w-3.5 mr-1" /> Request Withdrawal
+              </Button>
+            </div>
+
             {!withdrawalsQ.data || withdrawalsQ.data.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border p-10 text-center bg-card/40">
+                <Wallet className="h-8 w-8 text-muted-foreground/60 mx-auto mb-2" />
                 <p className="text-sm text-muted-foreground font-medium">No Withdrawal Requests</p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  You have not submitted any withdrawal requests.
+                  You have not submitted any withdrawal requests yet.
                 </p>
               </div>
             ) : (
@@ -525,43 +880,33 @@ function InvestorMetaFundDashboard() {
             )}
           </TabsContent>
 
-          {/* CAPITAL FLOW TAB */}
-          <TabsContent value="capital" className="space-y-3">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="bg-card/60 border-border/70">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-bold">Capital Position Summary</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2.5 text-xs">
-                  <div className="flex justify-between border-b border-border/60 py-1.5">
-                    <span className="text-muted-foreground">Cumulative Deposited</span>
-                    <span className="font-mono font-semibold">${deposited.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
+          {/* NOTIFICATIONS TAB */}
+          <TabsContent value="notifications" className="space-y-3">
+            <div className="rounded-xl border border-border/80 bg-card/60 p-5 space-y-3">
+              <h3 className="text-sm font-bold text-foreground flex items-center gap-2">
+                <Bell className="h-4 w-4 text-amber-400" /> Platform Announcements & Updates
+              </h3>
+              <div className="space-y-2.5 text-xs">
+                <div className="p-3 rounded-lg border border-border/60 bg-secondary/30">
+                  <div className="flex justify-between font-semibold text-foreground">
+                    <span>MetaFund Operational Governance Active</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">Platform Baseline</span>
                   </div>
-                  <div className="flex justify-between border-b border-border/60 py-1.5">
-                    <span className="text-muted-foreground">Cumulative Withdrawn</span>
-                    <span className="font-mono font-semibold">${withdrawn.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-border/60 py-1.5">
-                    <span className="text-muted-foreground">Net Contributed</span>
-                    <span className="font-mono font-semibold">${(deposited - withdrawn).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="flex justify-between py-1.5">
-                    <span className="text-muted-foreground">Total Economic Equity</span>
-                    <span className="font-mono font-bold text-amber-400">${equity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
-                  </div>
-                </CardContent>
-              </Card>
+                  <p className="text-muted-foreground mt-1">
+                    Multi-currency deposit intent workflows, execution snapshot participations, and immutable ledger accounting are active.
+                  </p>
+                </div>
 
-              <Card className="bg-card/60 border-border/70">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-bold">Cycle & Allocation Terms</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-2 text-xs text-muted-foreground leading-relaxed">
-                  <p>• Standard 70% Investor / 30% Company profit split on positive closed trades.</p>
-                  <p>• 100% loss absorption by capital pool with $0 company cut on negative results.</p>
-                  <p>• Idempotent immutable ledger postings for all balance changes.</p>
-                </CardContent>
-              </Card>
+                <div className="p-3 rounded-lg border border-border/60 bg-secondary/30">
+                  <div className="flex justify-between font-semibold text-foreground">
+                    <span>Standard Profit Split: 70% / 30%</span>
+                    <span className="text-[10px] text-muted-foreground font-mono">Terms</span>
+                  </div>
+                  <p className="text-muted-foreground mt-1">
+                    Participating investors receive 70% of net profits from winning trades. 100% loss absorption is covered with zero company performance deduction on loss trades.
+                  </p>
+                </div>
+              </div>
             </div>
           </TabsContent>
         </Tabs>

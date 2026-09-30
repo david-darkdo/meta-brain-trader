@@ -162,12 +162,12 @@ async function runTests() {
   assert(tradeAnalysisSource.includes('learning_insights'), 'trade-analysis.tsx contains learning insights and filters');
 
   // ----------------------------------------------------
-  // GROUP 5: METAFUND EMPTY STATE & ONBOARDING
+  // GROUP 5: METAFUND PLATFORM & ONBOARDING
   // ----------------------------------------------------
-  console.log('\n--- GROUP 5: MetaFund Empty State & Onboarding ---');
+  console.log('\n--- GROUP 5: MetaFund Platform & Onboarding ---');
   const metafundSource = fs.readFileSync('src/routes/_authenticated/metafund.tsx', 'utf-8');
-  assert(metafundSource.includes('Investor access not activated.'), 'MetaFund has "Investor access not activated." empty state');
-  assert(metafundSource.includes('Your MetaFund investor account has not yet been onboarded.'), 'MetaFund explains account not onboarded');
+  assert(metafundSource.includes('MetaFund'), 'MetaFund platform header exists');
+  assert(!metafundSource.includes('Investor access not activated. Contact an administrator'), 'MetaFund does not block entire screen with empty state');
 
   const commandCenterSource = fs.readFileSync('src/routes/_authenticated/command-center.tsx', 'utf-8');
   assert(commandCenterSource.includes('onboardInvestorAccount'), 'Command Center has investor onboarding action');

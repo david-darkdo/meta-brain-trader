@@ -106,6 +106,34 @@ export async function fetchInvestorWithdrawalRequests(accountId: string) {
   return data ?? [];
 }
 
+export async function fetchInvestorCapitalEvents(accountId: string) {
+  const { data, error } = await supabase
+    .from("capital_events")
+    .select("*")
+    .eq("investor_id", accountId)
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function requestInvestorDeposit(params: {
+  accountId: string;
+  amount: number;
+  currency?: string;
+  notes?: string;
+}) {
+  const { data, error } = await supabase.rpc("request_deposit", {
+    p_account_id: params.accountId,
+    p_amount: params.amount,
+    p_currency: params.currency || "USD",
+    p_notes: params.notes ?? null,
+  });
+
+  if (error) throw error;
+  return data;
+}
+
 export async function requestInvestorWithdrawal(params: {
   accountId: string;
   amount: number;
@@ -329,20 +357,11 @@ export async function onboardInvestorAccount(params: {
   currency?: string;
   status?: InvestorAccountStatus;
 }) {
-  const accNum =
-    params.accountNumber?.trim() ||
-    `MF-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
-
-  const { data, error } = await supabase
-    .from("investor_accounts")
-    .insert({
-      user_id: params.userId,
-      account_number: accNum,
-      currency: params.currency || "USD",
-      status: params.status || "ACTIVE",
-    })
-    .select()
-    .single();
+  const { data, error } = await supabase.rpc("onboard_investor_account", {
+    p_user_id: params.userId,
+    p_currency: params.currency || "USD",
+    p_account_number: params.accountNumber?.trim() || null,
+  });
 
   if (error) throw error;
   return data;
