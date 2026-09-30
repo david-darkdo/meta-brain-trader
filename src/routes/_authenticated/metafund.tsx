@@ -139,14 +139,25 @@ function InvestorMetaFundDashboard() {
   // Empty / No Account State
   if (!s || !s.investor_id) {
     return (
-      <div className="mx-auto max-w-2xl text-center py-16 space-y-4">
-        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400">
-          <ShieldCheck className="h-7 w-7" />
+      <div className="mx-auto max-w-xl text-center py-16 px-4 space-y-6">
+        <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shadow-[0_0_25px_rgba(245,158,11,0.12)]">
+          <ShieldCheck className="h-8 w-8" />
         </div>
-        <h2 className="text-2xl font-bold tracking-tight text-foreground">No Active Investor Account</h2>
-        <p className="text-muted-foreground text-sm max-w-md mx-auto">
-          Your profile is not currently registered as an active MetaFund investor. Please contact the fund administrator for capital onboarding.
-        </p>
+        <div className="space-y-2">
+          <div className="text-xs font-semibold uppercase tracking-wider text-amber-400">
+            MetaFund
+          </div>
+          <h2 className="text-2xl font-bold tracking-tight text-foreground">
+            Investor access not activated.
+          </h2>
+          <p className="text-sm text-muted-foreground max-w-md mx-auto leading-relaxed">
+            Your MetaFund investor account has not yet been onboarded.
+          </p>
+          <p className="text-xs text-muted-foreground/80 max-w-md mx-auto leading-relaxed pt-1">
+            If you are an authorized company administrator, complete investor onboarding from{" "}
+            <span className="text-foreground font-medium">Company Command Center</span>.
+          </p>
+        </div>
       </div>
     );
   }
