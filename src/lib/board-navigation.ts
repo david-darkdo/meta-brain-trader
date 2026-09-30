@@ -23,6 +23,7 @@ export const BOARD_PLATFORMS: readonly BoardPlatform[] = [
       "/dashboard",
       "/trade-creator",
       "/journal",
+      "/trade-analysis",
       "/strategy-profiles",
       "/trade-detail",
     ],
