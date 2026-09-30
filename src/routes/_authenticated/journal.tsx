@@ -1,12 +1,11 @@
-import { createFileRoute, Link, useSearch } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { deleteSingleTrade, deleteAllUserTrades } from "@/lib/trade-delete-service";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -18,357 +17,376 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ArrowLeft, Trash2, X, Award, ChevronRight } from "lucide-react";
+import {
+  BookOpen,
+  Plus,
+  Trash2,
+  Save,
+  ArrowLeft,
+  Calendar,
+  Clock,
+  FileText,
+  Sparkles,
+  Edit3,
+} from "lucide-react";
 import { toast } from "sonner";
 
-const searchSchema = z.object({
-  insight: z.string().optional(),
-  category: z.enum(["MISTAKE", "STRENGTH", "PATTERN"]).optional(),
-});
-
 export const Route = createFileRoute("/_authenticated/journal")({
-  head: () => ({ meta: [{ title: "Journal — MetaBrain Trader" }] }),
-  validateSearch: searchSchema,
-  component: Journal,
+  head: () => ({ meta: [{ title: "Personal Journal — MetaBrain Notebook" }] }),
+  component: PersonalJournal,
 });
 
-type TradeJournalRow = {
-  trade_id: string;
-  pair: string;
-  direction: string;
-  trade_status: string;
-  executed: boolean;
-  risk_pct: number | null;
+interface JournalNote {
+  id: string;
+  user_id: string;
+  title: string;
+  content: string;
   created_at: string;
-  results?: Array<{
-    outcome: string;
-    pnl_amount: number | null;
-    rr_achieved: number | null;
-  }>;
-  ai_analyses?: Array<{
-    stage: string;
-    ai_output: Record<string, unknown> & { stage?: string };
-    verdict: string | null;
-    entry_score: number | null;
-    created_at: string;
-  }>;
-};
+  updated_at: string;
+}
 
-function Journal() {
-  const { insight, category } = useSearch({ from: "/_authenticated/journal" });
+function PersonalJournal() {
   const qc = useQueryClient();
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
+  const [isCreating, setIsCreating] = useState(false);
+  const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  const tradesQ = useQuery({
-    queryKey: ["journal", "trades", insight ?? "", category ?? ""],
-    queryFn: async (): Promise<TradeJournalRow[]> => {
-      let allowedIds: string[] | null = null;
-      if (insight) {
-        const q = supabase
-          .from("learning_insights")
-          .select("referenced_trade_ids,content,category")
-          .eq("content", insight);
-        if (category) q.eq("category", category);
-        const { data } = await q;
-        allowedIds = Array.from(
-          new Set((data ?? []).flatMap((r) => r.referenced_trade_ids ?? [])),
-        );
-        if (allowedIds.length === 0) return [];
-      }
+  // Fetch all user journal notes
+  const notesQ = useQuery({
+    queryKey: ["journal_notes"],
+    queryFn: async (): Promise<JournalNote[]> => {
+      const { data, error } = await supabase
+        .from("journal_notes")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-      let query = supabase
-        .from("trades")
-        .select(
-          "trade_id,pair,direction,trade_status,executed,risk_pct,created_at,results(outcome,pnl_amount,rr_achieved),ai_analyses(stage,ai_output,verdict,entry_score,created_at)",
-        )
-        .order("created_at", { ascending: false })
-        .limit(100);
-
-      if (allowedIds) query = query.in("trade_id", allowedIds);
-      const { data, error } = await query;
       if (error) throw error;
-      return (data ?? []) as unknown as TradeJournalRow[];
+      return (data ?? []) as JournalNote[];
     },
   });
 
-  const invalidateAll = () => {
-    qc.invalidateQueries({ queryKey: ["journal"] });
-    qc.invalidateQueries({ queryKey: ["trades"] });
-    qc.invalidateQueries({ queryKey: ["dashboard_metrics"] });
-    qc.invalidateQueries({ queryKey: ["learning_insights"] });
-  };
+  // Save / Update Note Mutation
+  const saveNoteMut = useMutation({
+    mutationFn: async () => {
+      const cleanTitle = title.trim();
+      const cleanContent = content.trim();
+      if (!cleanTitle) throw new Error("Please provide a title for your note.");
+      if (!cleanContent) throw new Error("Please write some content before saving.");
 
-  const deleteSingleMut = useMutation({
-    mutationFn: async (tradeId: string) => {
-      setDeletingId(tradeId);
-      await deleteSingleTrade(tradeId);
+      const { data: u } = await supabase.auth.getUser();
+      const userId = u.user?.id;
+      if (!userId) throw new Error("You must be logged in to save notes.");
+
+      if (selectedNoteId) {
+        // Update existing note
+        const { data, error } = await supabase
+          .from("journal_notes")
+          .update({
+            title: cleanTitle,
+            content: cleanContent,
+          })
+          .eq("id", selectedNoteId)
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data as JournalNote;
+      } else {
+        // Create new note
+        const { data, error } = await supabase
+          .from("journal_notes")
+          .insert({
+            user_id: userId,
+            title: cleanTitle,
+            content: cleanContent,
+          })
+          .select()
+          .single();
+
+        if (error) throw error;
+        return data as JournalNote;
+      }
     },
-    onSuccess: () => {
-      toast.success("Trade deleted");
-      invalidateAll();
+    onSuccess: (saved) => {
+      toast.success(selectedNoteId ? "Note updated" : "Note saved to your journal");
+      qc.invalidateQueries({ queryKey: ["journal_notes"] });
+      setSelectedNoteId(saved.id);
+      setIsCreating(false);
     },
     onError: (err: any) => {
-      toast.error(err?.message || "Failed to delete trade");
+      toast.error(err?.message || "Failed to save note");
+    },
+  });
+
+  // Delete Note Mutation
+  const deleteNoteMut = useMutation({
+    mutationFn: async (id: string) => {
+      setDeletingId(id);
+      const { error } = await supabase
+        .from("journal_notes")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Note deleted");
+      qc.invalidateQueries({ queryKey: ["journal_notes"] });
+      if (selectedNoteId === deletingId) {
+        handleStartNew();
+      }
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Failed to delete note");
     },
     onSettled: () => {
       setDeletingId(null);
     },
   });
 
-  const deleteAllMut = useMutation({
-    mutationFn: async () => {
-      const { data: userRes } = await supabase.auth.getUser();
-      const userId = userRes.user?.id;
-      if (!userId) throw new Error("Not authenticated");
-      await deleteAllUserTrades(userId);
-    },
-    onSuccess: () => {
-      toast.success("All trade history cleared");
-      invalidateAll();
-    },
-    onError: (err: any) => {
-      toast.error(err?.message || "Failed to clear trade history");
-    },
-  });
+  function handleSelectNote(note: JournalNote) {
+    setSelectedNoteId(note.id);
+    setTitle(note.title);
+    setContent(note.content);
+    setIsCreating(false);
+  }
 
-  const hasTrades = tradesQ.data && tradesQ.data.length > 0;
+  function handleStartNew() {
+    setSelectedNoteId(null);
+    setTitle("");
+    setContent("");
+    setIsCreating(true);
+  }
+
+  const activeNote = notesQ.data?.find((n) => n.id === selectedNoteId);
 
   return (
     <div className="space-y-6">
-      <Link
-        to="/validator"
-        className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-      >
-        <ArrowLeft className="h-4 w-4" /> Back to Meta Validator
-      </Link>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* 1. HEADER & NAVIGATION */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Journal</h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Decision memory and trade history, scanable at a glance.
+          <Link
+            to="/validator"
+            className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground mb-1.5"
+          >
+            <ArrowLeft className="h-3.5 w-3.5" /> Back to Meta Validator
+          </Link>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-sans flex items-center gap-2">
+            <BookOpen className="h-6 w-6 text-amber-400" />
+            Personal Journal
+          </h1>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            Your private trading notebook. Record mental models, lessons, and market psychology.
           </p>
         </div>
+
         <div className="flex items-center gap-2">
-          {insight && (
-            <div className="flex items-center gap-2">
-              <Badge variant={category === "STRENGTH" ? "default" : "destructive"}>
-                {category ?? "Pattern"}
-              </Badge>
-              <span className="text-sm font-semibold">{insight}</span>
-              <Button asChild size="sm" variant="ghost">
-                <Link to="/journal">
-                  <X className="h-3.5 w-3.5" />
-                </Link>
-              </Button>
-            </div>
-          )}
-          {hasTrades && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
-                >
-                  <Trash2 className="mr-1.5 h-3.5 w-3.5" /> Clear All History
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Clear All Trade History?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This will permanently delete all trades, chart screenshots, post-trade
-                    reflections, and AI analyses from your account. This action cannot be undone.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={() => deleteAllMut.mutate()}
-                  >
-                    Delete Everything
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          )}
+          <Button
+            type="button"
+            onClick={handleStartNew}
+            className="gold-gradient-btn text-xs h-9"
+          >
+            <Plus className="h-4 w-4 mr-1" /> New Entry
+          </Button>
         </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            {insight ? `Trades tagged "${insight}"` : "All trades"}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!tradesQ.data || tradesQ.data.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No trades match this filter.</p>
+      {/* 2. MAIN NOTEBOOK WORKSPACE: 2-COLUMN SPLIT */}
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start">
+        {/* LEFT COLUMN: NOTES LIST (4 COLS) */}
+        <div className="md:col-span-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Journal Entries ({notesQ.data?.length ?? 0})
+            </h2>
+          </div>
+
+          {notesQ.isLoading ? (
+            <div className="p-8 text-center text-xs text-muted-foreground rounded-xl border border-border/60 bg-card/40">
+              Loading your notes...
+            </div>
+          ) : !notesQ.data || notesQ.data.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border/70 p-6 text-center bg-card/30">
+              <FileText className="h-8 w-8 text-muted-foreground/60 mx-auto mb-2" />
+              <p className="text-xs text-muted-foreground">Your journal is empty.</p>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={handleStartNew}
+                className="mt-3 text-xs border-amber-500/30 text-amber-400"
+              >
+                Write your first note
+              </Button>
+            </div>
           ) : (
-            <ul className="divide-y divide-border">
-              {tradesQ.data.map((t) => {
-                const res = t.results?.[0] || null;
-                const analyses = t.ai_analyses || [];
-                const verdictStage = analyses.find(
-                  (a) => (a.ai_output?.stage || a.stage) === "VERDICT",
-                );
-                const coachStage = analyses.find(
-                  (a) => (a.ai_output?.stage || a.stage) === "COACH_REPORT",
-                );
-                const reviewStage = analyses.find(
-                  (a) => (a.ai_output?.stage || a.stage) === "REVIEW",
-                );
-
-                const vOut = (verdictStage?.ai_output ?? {}) as Record<string, unknown>;
-                const cOut = (coachStage?.ai_output ?? {}) as Record<string, unknown>;
-                const rOut = (reviewStage?.ai_output ?? {}) as Record<string, unknown>;
-
-                const verdict = (verdictStage?.verdict || vOut.verdict as string) || null;
-                const entryScore = verdictStage?.entry_score ?? (typeof vOut.entry_score === "number" ? vOut.entry_score : null);
-                const headline =
-                  (vOut.executive_headline as string) ||
-                  (cOut.executive_headline as string) ||
-                  (rOut.executive_headline as string) ||
-                  null;
-                const summary =
-                  (vOut.decision_summary as string) ||
-                  (cOut.decision_summary as string) ||
-                  (vOut.primary_reason as string) ||
-                  null;
-                const coreLesson =
-                  (cOut.core_lesson as string) || (cOut.top_lesson as string) || null;
-
-                const outcome = res?.outcome || null;
-                const rr = res?.rr_achieved != null ? res.rr_achieved : null;
-                const isWin = outcome === "WIN";
-                const isLoss = outcome === "LOSS";
+            <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+              {notesQ.data.map((note) => {
+                const isSelected = note.id === selectedNoteId;
+                const formattedDate = new Date(note.created_at).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
 
                 return (
-                  <li key={t.trade_id} className="group py-3">
-                    <div className="flex items-start justify-between gap-3">
-                      <Link
-                        to="/trade-detail/$id"
-                        params={{ id: t.trade_id }}
-                        className="flex flex-1 flex-col gap-2 rounded-lg p-2 transition-colors hover:bg-secondary/40"
-                      >
-                        {/* ROW 1: PAIR, DIRECTION, OUTCOME, VERDICT */}
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2.5">
-                            <span
-                              className={`inline-block h-2.5 w-2.5 rounded-full ${
-                                t.direction === "LONG" ? "bg-success" : "bg-destructive"
-                              }`}
-                            />
-                            <span className="text-base font-bold tracking-tight text-foreground">
-                              {t.pair}
-                            </span>
-                            <Badge
-                              variant={t.direction === "LONG" ? "default" : "destructive"}
-                              className="text-[10px]"
+                  <div
+                    key={note.id}
+                    onClick={() => handleSelectNote(note)}
+                    className={`group relative flex flex-col justify-between p-3.5 rounded-xl border cursor-pointer transition-all ${
+                      isSelected
+                        ? "border-amber-400/60 bg-card shadow-[0_4px_16px_rgba(245,158,11,0.08)]"
+                        : "border-border/70 bg-card/60 hover:bg-card hover:border-border"
+                    }`}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-mono text-amber-400/90 flex items-center gap-1">
+                          <Calendar className="h-3 w-3" />
+                          {formattedDate}
+                        </span>
+
+                        <AlertDialog>
+                          <AlertDialogTrigger asChild onClick={(e) => e.stopPropagation()}>
+                            <button
+                              type="button"
+                              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-rose-400 p-1 rounded transition-opacity"
+                              title="Delete note"
                             >
-                              {t.direction}
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(t.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {outcome && (
-                              <Badge
-                                variant={isWin ? "default" : isLoss ? "destructive" : "secondary"}
-                                className="font-bold"
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </AlertDialogTrigger>
+                          <AlertDialogContent className="bg-card border-border">
+                            <AlertDialogHeader>
+                              <AlertDialogTitle className="text-foreground">Delete Note?</AlertDialogTitle>
+                              <AlertDialogDescription>
+                                Are you sure you want to delete "{note.title}"? This cannot be undone.
+                              </AlertDialogDescription>
+                            </AlertDialogHeader>
+                            <AlertDialogFooter>
+                              <AlertDialogCancel>Cancel</AlertDialogCancel>
+                              <AlertDialogAction
+                                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                onClick={() => deleteNoteMut.mutate(note.id)}
                               >
-                                {outcome}
-                                {rr != null && ` · ${rr > 0 ? `+${rr}` : rr}R`}
-                              </Badge>
-                            )}
-                            {verdict && (
-                              <Badge
-                                variant={
-                                  verdict === "APPROVED"
-                                    ? "default"
-                                    : verdict === "DISQUALIFIED"
-                                      ? "destructive"
-                                      : "secondary"
-                                }
-                                className="font-bold"
-                              >
-                                {verdict}
-                                {entryScore != null && ` · ${entryScore}`}
-                              </Badge>
-                            )}
-                            <Badge variant="outline" className="text-[10px]">
-                              {t.executed ? "Executed" : "Skipped"}
-                            </Badge>
-                            <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
-                          </div>
-                        </div>
+                                Delete
+                              </AlertDialogAction>
+                            </AlertDialogFooter>
+                          </AlertDialogContent>
+                        </AlertDialog>
+                      </div>
 
-                        {/* ROW 2: AI EXECUTIVE HEADLINE / SUMMARY */}
-                        {(headline || summary) && (
-                          <div className="rounded border border-primary/15 bg-primary/5 p-2 text-xs">
-                            {headline && (
-                              <div className="font-mono font-bold uppercase tracking-wider text-primary">
-                                {headline}
-                              </div>
-                            )}
-                            {summary && (
-                              <p className="mt-0.5 line-clamp-2 text-muted-foreground">
-                                {summary}
-                              </p>
-                            )}
-                          </div>
-                        )}
-
-                        {/* ROW 3: CORE LESSON (If post-analyzed) */}
-                        {coreLesson && (
-                          <div className="flex items-center gap-1.5 text-xs text-foreground/80">
-                            <Award className="h-3 w-3 text-primary shrink-0" />
-                            <span className="font-medium truncate">Lesson: {coreLesson}</span>
-                          </div>
-                        )}
-                      </Link>
-
-                      <AlertDialog>
-                        <AlertDialogTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="mt-2 h-8 w-8 text-muted-foreground hover:text-destructive"
-                            disabled={deletingId === t.trade_id}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </AlertDialogTrigger>
-                        <AlertDialogContent>
-                          <AlertDialogHeader>
-                            <AlertDialogTitle>Delete Trade ({t.pair})?</AlertDialogTitle>
-                            <AlertDialogDescription>
-                              This will permanently delete this trade, its screenshots, reflections,
-                              and AI analysis records.
-                            </AlertDialogDescription>
-                          </AlertDialogHeader>
-                          <AlertDialogFooter>
-                            <AlertDialogCancel>Cancel</AlertDialogCancel>
-                            <AlertDialogAction
-                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                              onClick={() => deleteSingleMut.mutate(t.trade_id)}
-                            >
-                              Delete Trade
-                            </AlertDialogAction>
-                          </AlertDialogFooter>
-                        </AlertDialogContent>
-                      </AlertDialog>
+                      <h3 className="text-sm font-bold text-foreground truncate group-hover:text-amber-400 transition-colors">
+                        {note.title}
+                      </h3>
+                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
+                        {note.content}
+                      </p>
                     </div>
-                  </li>
+                  </div>
                 );
               })}
-            </ul>
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </div>
+
+        {/* RIGHT COLUMN: NOTE WRITING / EDITING CANVAS (8 COLS) */}
+        <div className="md:col-span-8">
+          <Card className="border-border/80 bg-card/80 backdrop-blur-md">
+            <CardHeader className="pb-3 border-b border-border/60">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Edit3 className="h-4 w-4 text-amber-400" />
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    {selectedNoteId ? "Edit Journal Entry" : "New Journal Entry"}
+                  </span>
+                </div>
+                {activeNote && (
+                  <span className="text-xs text-muted-foreground flex items-center gap-1 font-mono">
+                    <Clock className="h-3 w-3" />
+                    Recorded {new Date(activeNote.created_at).toLocaleDateString("en-US", {
+                      month: "long",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                )}
+              </div>
+            </CardHeader>
+            <CardContent className="p-5 space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Title</label>
+                <Input
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="e.g. London Session Discipline & Patience..."
+                  className="text-base font-semibold bg-secondary/40 border-border focus-visible:ring-amber-400"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-muted-foreground">Notebook Content</label>
+                <Textarea
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  placeholder="Today I noticed that I entered before 15m candle close confirmation. Next time, wait for the liquidity sweep..."
+                  rows={12}
+                  className="bg-secondary/40 border-border focus-visible:ring-amber-400 font-sans text-sm leading-relaxed"
+                />
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <div>
+                  {selectedNoteId && (
+                    <AlertDialog>
+                      <AlertDialogTrigger asChild>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-xs"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1" /> Delete Entry
+                        </Button>
+                      </AlertDialogTrigger>
+                      <AlertDialogContent className="bg-card border-border">
+                        <AlertDialogHeader>
+                          <AlertDialogTitle className="text-foreground">Delete Entry?</AlertDialogTitle>
+                          <AlertDialogDescription>
+                            Are you sure you want to permanently delete this journal entry?
+                          </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>Cancel</AlertDialogCancel>
+                          <AlertDialogAction
+                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            onClick={() => selectedNoteId && deleteNoteMut.mutate(selectedNoteId)}
+                          >
+                            Delete
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    onClick={() => saveNoteMut.mutate()}
+                    disabled={saveNoteMut.isPending || !title.trim() || !content.trim()}
+                    className="gold-gradient-btn text-xs font-semibold h-9 px-4"
+                  >
+                    <Save className="h-3.5 w-3.5 mr-1.5" />
+                    {saveNoteMut.isPending ? "Saving..." : selectedNoteId ? "Update Note" : "Save Note"}
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
     </div>
   );
 }
