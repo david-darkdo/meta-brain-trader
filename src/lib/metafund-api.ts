@@ -92,7 +92,7 @@ export async function fetchInvestorTradeHistory(): Promise<InvestorTradeHistoryR
     .order("created_at", { ascending: false });
 
   if (error) throw error;
-  return (data ?? []) as InvestorTradeHistoryRow[];
+  return (data ?? []) as unknown as InvestorTradeHistoryRow[];
 }
 
 export async function fetchInvestorWithdrawalRequests(accountId: string) {

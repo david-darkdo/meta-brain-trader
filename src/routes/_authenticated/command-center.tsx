@@ -1,27 +1,25 @@
-import { createFileRoute, redirect, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
 import {
   fetchCompanyFinancialSummary,
   fetchAllInvestors,
   fetchAllCapitalEvents,
-  activateInvestorCapital,
-  fetchInvestmentCycles,
-  createInvestmentCycle,
-  activateInvestmentCycle,
-  closeInvestmentCycle,
   fetchAllWithdrawals,
-  approveWithdrawal,
-  settleWithdrawal,
-  rejectWithdrawal,
+  fetchInvestmentCycles,
   fetchFinancialLedger,
   fetchPlatformConfig,
   runSystemReconciliation,
   fetchAuditLogs,
+  activateInvestorCapital,
+  createInvestmentCycle,
+  activateInvestmentCycle,
+  closeInvestmentCycle,
+  approveWithdrawal,
+  settleWithdrawal,
+  rejectWithdrawal,
   onboardInvestorAccount,
   fetchEligibleUsersForOnboarding,
-  type CompanySummary,
   type ReconciliationCheck,
 } from "@/lib/metafund-api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -40,70 +38,76 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   ShieldAlert,
   Users,
+  Layers,
+  ArrowUpRight,
+  ArrowDownLeft,
+  CheckCircle2,
+  AlertTriangle,
+  RotateCcw,
+  Plus,
+  Lock,
   DollarSign,
   TrendingUp,
   RefreshCw,
-  PlusCircle,
-  CheckCircle2,
-  AlertTriangle,
-  XCircle,
-  FileText,
-  Activity,
   Sliders,
-  Lock,
-  ArrowLeft,
   UserPlus,
+  ShieldCheck,
+  FileCheck2,
 } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/command-center")({
-  beforeLoad: async () => {
-    try {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) throw redirect({ to: "/auth" });
-      const { data: roles } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", u.user.id);
-      const isAdmin = (roles ?? []).some((r) => r.role === "ADMIN");
-      if (!isAdmin) {
-        throw redirect({ to: "/validator" });
-      }
-    } catch (err: any) {
-      if (err?.to || err?.isRedirect) throw err;
-      throw redirect({ to: "/validator" });
-    }
-  },
-  head: () => ({ meta: [{ title: "Command Center — MetaFund Operations" }] }),
-  component: CompanyCommandCenter,
+  head: () => ({ meta: [{ title: "Command Center — Administrative Control" }] }),
+  component: CommandCenterDashboard,
 });
 
-function CompanyCommandCenter() {
+function CommandCenterDashboard() {
   const qc = useQueryClient();
 
-  // State for Modals
+  // Active Tab
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "investors" | "capital" | "cycles" | "withdrawals" | "ledger" | "reconciliation" | "audit"
+  >("overview");
+
+  // State for Onboard Investor Dialog
   const [isOnboardOpen, setIsOnboardOpen] = useState(false);
   const [onboardUserId, setOnboardUserId] = useState("");
-  const [onboardCurrency, setOnboardCurrency] = useState("USD");
   const [onboardAccountNum, setOnboardAccountNum] = useState("");
+  const [onboardCurrency, setOnboardCurrency] = useState("USD");
 
-  const [isDepositOpen, setIsDepositOpen] = useState(false);
+  // State for Capital Activation Dialog
+  const [isActivateCapitalOpen, setIsActivateCapitalOpen] = useState(false);
   const [selectedInvestorId, setSelectedInvestorId] = useState("");
-  const [depositAmount, setDepositAmount] = useState("");
-  const [depositCurrency, setDepositCurrency] = useState("USD");
-  const [depositFxRate, setDepositFxRate] = useState("1.0");
+  const [activateAmount, setActivateAmount] = useState("");
+  const [activateCurrency, setActivateCurrency] = useState("USD");
+  const [activateFxRate, setActivateFxRate] = useState("1.0");
+  const [activateNotes, setActivateNotes] = useState("");
 
-  const [isCycleOpen, setIsCycleOpen] = useState(false);
+  // State for Create Cycle Dialog
+  const [isCreateCycleOpen, setIsCreateCycleOpen] = useState(false);
   const [cycleName, setCycleName] = useState("");
   const [cycleStartDate, setCycleStartDate] = useState("");
   const [cycleEndDate, setCycleEndDate] = useState("");
   const [cycleInvestorSplit, setCycleInvestorSplit] = useState("70");
   const [cycleCompanySplit, setCycleCompanySplit] = useState("30");
+  const [cycleNotes, setCycleNotes] = useState("");
+
+  // State for Reject Withdrawal Dialog
+  const [isRejectOpen, setIsRejectOpen] = useState(false);
+  const [selectedWithdrawalId, setSelectedWithdrawalId] = useState("");
+  const [rejectReason, setRejectReason] = useState("");
 
   // 1. Company Financial Summary
-  const summaryQ = useQuery({
+  const companySummaryQ = useQuery({
     queryKey: ["admin", "company_summary"],
     queryFn: fetchCompanyFinancialSummary,
   });
@@ -114,7 +118,7 @@ function CompanyCommandCenter() {
     queryFn: fetchAllInvestors,
   });
 
-  // 2b. Eligible Users for Onboarding
+  // Eligible Users for Onboarding
   const eligibleUsersQ = useQuery({
     queryKey: ["admin", "eligible_users"],
     queryFn: fetchEligibleUsersForOnboarding,
@@ -131,8 +135,8 @@ function CompanyCommandCenter() {
         status: "ACTIVE",
       });
     },
-    onSuccess: (acc) => {
-      toast.success(`Investor account ${acc.account_number} created successfully.`);
+    onSuccess: (acc: any) => {
+      toast.success(`Investor account ${acc?.account_number || ""} created successfully.`);
       setIsOnboardOpen(false);
       setOnboardUserId("");
       setOnboardAccountNum("");
@@ -170,12 +174,12 @@ function CompanyCommandCenter() {
 
   // 7. Platform Config
   const configQ = useQuery({
-    queryKey: ["admin", "platform_config"],
+    queryKey: ["admin", "config"],
     queryFn: fetchPlatformConfig,
   });
 
   // 8. Reconciliation Engine
-  const reconQ = useQuery({
+  const reconciliationQ = useQuery({
     queryKey: ["admin", "reconciliation"],
     queryFn: runSystemReconciliation,
   });
@@ -183,511 +187,1014 @@ function CompanyCommandCenter() {
   // 9. Audit Logs
   const auditLogsQ = useQuery({
     queryKey: ["admin", "audit_logs"],
-    queryFn: () => fetchAuditLogs(50),
+    queryFn: () => fetchAuditLogs(100),
   });
 
-  // MUTATIONS
-  const activateCapitalMut = useMutation({
+  // Mutations
+  const activateCapitalMutation = useMutation({
     mutationFn: async () => {
-      if (!selectedInvestorId) throw new Error("Select an investor account.");
-      const amt = Number(depositAmount);
-      const fx = Number(depositFxRate);
-      if (isNaN(amt) || amt <= 0) throw new Error("Enter a valid deposit amount.");
-      if (isNaN(fx) || fx <= 0) throw new Error("Enter a valid exchange rate.");
+      if (!selectedInvestorId) throw new Error("Please select an investor.");
+      const amt = Number(activateAmount);
+      if (isNaN(amt) || amt <= 0) throw new Error("Amount must be greater than 0.");
+      const fx = Number(activateFxRate);
 
       return activateInvestorCapital({
         investorId: selectedInvestorId,
         amount: amt,
-        currency: depositCurrency,
-        exchangeRate: fx,
-        fxSource: depositCurrency === "USD" ? "BASE_CURRENCY" : "ADMIN_OPERATOR",
+        currency: activateCurrency,
+        exchangeRate: isNaN(fx) ? 1.0 : fx,
+        notes: activateNotes || undefined,
       });
     },
     onSuccess: () => {
-      toast.success("Capital activated and posted to immutable ledger successfully.");
-      setIsDepositOpen(false);
-      setDepositAmount("");
+      toast.success("Capital event activated and posted to ledger.");
+      setIsActivateCapitalOpen(false);
+      setActivateAmount("");
+      setActivateNotes("");
       qc.invalidateQueries({ queryKey: ["admin"] });
     },
-    onError: (err: any) => toast.error(err?.message || "Failed to activate capital."),
+    onError: (err: any) => {
+      toast.error(err?.message || "Failed to activate capital event.");
+    },
   });
 
-  const createCycleMut = useMutation({
+  const createCycleMutation = useMutation({
     mutationFn: async () => {
-      if (!cycleName || !cycleStartDate || !cycleEndDate) throw new Error("Fill in all cycle fields.");
-      const invSplit = Number(cycleInvestorSplit);
-      const compSplit = Number(cycleCompanySplit);
-      if (invSplit + compSplit !== 100) throw new Error("Profit splits must sum to exactly 100%.");
-
+      if (!cycleName || !cycleStartDate || !cycleEndDate) {
+        throw new Error("Please fill in cycle name, start date, and end date.");
+      }
       return createInvestmentCycle({
         name: cycleName,
-        startDate: new Date(cycleStartDate).toISOString(),
-        endDate: new Date(cycleEndDate).toISOString(),
-        investorSplit: invSplit,
-        companySplit: compSplit,
+        startDate: cycleStartDate,
+        endDate: cycleEndDate,
+        investorSplit: Number(cycleInvestorSplit),
+        companySplit: Number(cycleCompanySplit),
+        notes: cycleNotes || undefined,
       });
     },
     onSuccess: () => {
-      toast.success("Investment cycle created.");
-      setIsCycleOpen(false);
+      toast.success("Investment cycle created successfully.");
+      setIsCreateCycleOpen(false);
       setCycleName("");
+      setCycleNotes("");
       qc.invalidateQueries({ queryKey: ["admin", "cycles"] });
     },
-    onError: (err: any) => toast.error(err?.message || "Failed to create cycle."),
+    onError: (err: any) => {
+      toast.error(err?.message || "Failed to create cycle.");
+    },
   });
 
-  const s = summaryQ.data;
+  const activateCycleMutation = useMutation({
+    mutationFn: (cycleId: string) => activateInvestmentCycle(cycleId),
+    onSuccess: () => {
+      toast.success("Cycle activated.");
+      qc.invalidateQueries({ queryKey: ["admin", "cycles"] });
+    },
+    onError: (err: any) => toast.error(err?.message || "Failed to activate cycle."),
+  });
 
-  // Authorization / Loading Guard
-  if (summaryQ.isLoading) {
-    return (
-      <div className="flex h-96 items-center justify-center space-x-2">
-        <RefreshCw className="h-6 w-6 animate-spin text-primary" />
-        <span className="text-muted-foreground text-sm">Loading Company Command Center...</span>
-      </div>
-    );
-  }
+  const closeCycleMutation = useMutation({
+    mutationFn: (cycleId: string) => closeInvestmentCycle(cycleId),
+    onSuccess: () => {
+      toast.success("Cycle closed and settled.");
+      qc.invalidateQueries({ queryKey: ["admin", "cycles"] });
+      qc.invalidateQueries({ queryKey: ["admin", "company_summary"] });
+    },
+    onError: (err: any) => toast.error(err?.message || "Failed to close cycle."),
+  });
 
-  if (summaryQ.isError) {
-    return (
-      <Card className="border-destructive/50 bg-destructive/5">
-        <CardHeader>
-          <CardTitle className="text-destructive flex items-center gap-2">
-            <ShieldAlert className="h-5 w-5" /> Access Denied or Initialization Error
-          </CardTitle>
-          <CardDescription>
-            Only authorized administrators can access the Company Command Center.
-          </CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
+  const approveWithdrawalMutation = useMutation({
+    mutationFn: (requestId: string) => approveWithdrawal(requestId),
+    onSuccess: () => {
+      toast.success("Withdrawal approved.");
+      qc.invalidateQueries({ queryKey: ["admin", "withdrawals"] });
+    },
+    onError: (err: any) => toast.error(err?.message || "Failed to approve withdrawal."),
+  });
 
-  const totalEquity = Number(s?.total_economic_equity ?? 0);
-  const totalAvailable = Number(s?.total_available_capital ?? 0);
-  const totalCommitted = Number(s?.total_active_committed_capital ?? 0);
-  const companyProfitShare = Number(s?.pending_company_profit_share ?? 0);
-  const totalDeposited = Number(s?.total_deposited ?? 0);
-  const totalWithdrawn = Number(s?.total_withdrawn ?? 0);
+  const settleWithdrawalMutation = useMutation({
+    mutationFn: (requestId: string) => settleWithdrawal(requestId),
+    onSuccess: () => {
+      toast.success("Withdrawal settled and disbursed.");
+      qc.invalidateQueries({ queryKey: ["admin", "withdrawals"] });
+      qc.invalidateQueries({ queryKey: ["admin", "company_summary"] });
+      qc.invalidateQueries({ queryKey: ["admin", "ledger"] });
+    },
+    onError: (err: any) => toast.error(err?.message || "Failed to settle withdrawal."),
+  });
+
+  const rejectWithdrawalMutation = useMutation({
+    mutationFn: async () => {
+      if (!rejectReason) throw new Error("Please enter a rejection reason.");
+      return rejectWithdrawal(selectedWithdrawalId, rejectReason);
+    },
+    onSuccess: () => {
+      toast.success("Withdrawal request rejected.");
+      setIsRejectOpen(false);
+      setRejectReason("");
+      qc.invalidateQueries({ queryKey: ["admin", "withdrawals"] });
+    },
+    onError: (err: any) => toast.error(err?.message || "Failed to reject withdrawal."),
+  });
+
+  const cs = companySummaryQ.data;
+  const cfg = configQ.data;
+
+  // Summary Metrics
+  const totalEquity = Number(cs?.total_economic_equity ?? 0);
+  const totalAvailable = Number(cs?.total_available_capital ?? 0);
+  const totalCommitted = Number(cs?.total_active_committed_capital ?? 0);
+  const totalNetPnl = Number(cs?.net_trading_pnl ?? 0);
+  const pendingCompanyCut = Number(cs?.pending_company_profit_share ?? 0);
+  const activeInvestorsCount = Number(cs?.active_investors ?? 0);
 
   return (
-    <div className="space-y-8">
-      {/* HEADER */}
-      <div className="space-y-4">
-        <Link
-          to="/profile"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="h-4 w-4" /> Back to Profile & Settings
-        </Link>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-3xl font-bold tracking-tight">Company Command Center</h1>
-              <Badge variant="outline" className="border-primary text-primary">ADMIN OPERATIONAL ENGINE</Badge>
-            </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Financial controls, multi-currency activation, risk basis governance, and ledger auditing.
-            </p>
+    <div className="space-y-6">
+      {/* 1. ADMIN PLATFORM HEADER */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-sans">
+              Command Center
+            </h1>
+            <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/30 text-[10px] uppercase font-mono tracking-wider">
+              ADMIN CONTROL
+            </Badge>
           </div>
+          <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
+            Administrative Operations & Institutional Capital Governance
+          </p>
+        </div>
 
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => qc.invalidateQueries({ queryKey: ["admin"] })}>
-            <RefreshCw className="h-4 w-4 mr-2" /> Refresh System
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => qc.invalidateQueries({ queryKey: ["admin"] })}
+            className="border-border/80 bg-secondary/40 text-xs h-8"
+          >
+            <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh All
           </Button>
 
-          <Dialog open={isDepositOpen} onOpenChange={setIsDepositOpen}>
+          {/* ONBOARD INVESTOR DIALOG */}
+          <Dialog open={isOnboardOpen} onOpenChange={setIsOnboardOpen}>
             <DialogTrigger asChild>
-              <Button size="sm">
-                <PlusCircle className="h-4 w-4 mr-1" /> Activate Capital
+              <Button size="sm" variant="outline" className="border-amber-500/30 text-amber-400 hover:bg-amber-400/10 text-xs h-8">
+                <UserPlus className="h-3.5 w-3.5 mr-1" /> Onboard Investor
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md">
+            <DialogContent className="sm:max-w-md bg-card border-border">
               <DialogHeader>
-                <DialogTitle>Activate Investor Capital</DialogTitle>
+                <DialogTitle className="text-foreground">Onboard Investor Account</DialogTitle>
                 <DialogDescription>
-                  Atomically records capital event and posts immutable entry to financial ledger.
+                  Provision an official investor profile for an authenticated user. Zero capital is created until a capital deposit event is activated.
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-3">
-                <div className="space-y-1">
-                  <Label>Investor Account</Label>
-                  <select
-                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                    value={selectedInvestorId}
-                    onChange={(e) => setSelectedInvestorId(e.target.value)}
-                  >
-                    <option value="">Select Investor Account...</option>
-                    {investorsQ.data?.map((inv: any) => (
-                      <option key={inv.id} value={inv.id}>
-                        {inv.account_number} ({inv.users?.email || inv.id})
-                      </option>
-                    ))}
-                  </select>
+                <div className="space-y-1.5">
+                  <Label htmlFor="onboard-user" className="text-xs text-muted-foreground">Select User</Label>
+                  <Select value={onboardUserId} onValueChange={setOnboardUserId}>
+                    <SelectTrigger id="onboard-user" className="bg-secondary/50 border-border">
+                      <SelectValue placeholder="Choose a registered user..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border max-h-56">
+                      {eligibleUsersQ.data?.map((u: any) => (
+                        <SelectItem key={u.user_id} value={u.user_id}>
+                          {u.email || u.user_id} ({u.subscription_tier})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1">
-                    <Label>Nominal Amount</Label>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="onboard-acc" className="text-xs text-muted-foreground">Account Number (Optional)</Label>
                     <Input
-                      type="number"
-                      step="any"
-                      placeholder="10000"
-                      value={depositAmount}
-                      onChange={(e) => setDepositAmount(e.target.value)}
+                      id="onboard-acc"
+                      placeholder="e.g. MF-10001 (Auto if empty)"
+                      value={onboardAccountNum}
+                      onChange={(e) => setOnboardAccountNum(e.target.value)}
+                      className="bg-secondary/50 border-border focus-visible:ring-amber-400"
                     />
                   </div>
-                  <div className="space-y-1">
-                    <Label>Currency</Label>
-                    <select
-                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-                      value={depositCurrency}
-                      onChange={(e) => {
-                        const cur = e.target.value;
-                        setDepositCurrency(cur);
-                        if (cur === "USD") setDepositFxRate("1.0");
-                        else if (cur === "EUR") setDepositFxRate("1.08");
-                        else if (cur === "GBP") setDepositFxRate("1.31");
-                      }}
-                    >
-                      <option value="USD">USD ($)</option>
-                      <option value="EUR">EUR (€)</option>
-                      <option value="GBP">GBP (£)</option>
-                      <option value="NGN">NGN (₦)</option>
-                    </select>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="onboard-curr" className="text-xs text-muted-foreground">Account Base Currency</Label>
+                    <Select value={onboardCurrency} onValueChange={setOnboardCurrency}>
+                      <SelectTrigger id="onboard-curr" className="bg-secondary/50 border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        <SelectItem value="USD">USD ($)</SelectItem>
+                        <SelectItem value="EUR">EUR (€)</SelectItem>
+                        <SelectItem value="GBP">GBP (£)</SelectItem>
+                      </SelectContent>
+                    </SelectContent>
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <Label>Exchange Rate to USD</Label>
-                  <Input
-                    type="number"
-                    step="any"
-                    value={depositFxRate}
-                    onChange={(e) => setDepositFxRate(e.target.value)}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Calculated Base USD: ${(Number(depositAmount || 0) * Number(depositFxRate || 1)).toFixed(2)} USD
-                  </p>
                 </div>
               </div>
               <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDepositOpen(false)}>Cancel</Button>
-                <Button disabled={activateCapitalMut.isPending} onClick={() => activateCapitalMut.mutate()}>
-                  {activateCapitalMut.isPending ? "Activating..." : "Confirm & Activate"}
+                <Button variant="outline" onClick={() => setIsOnboardOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="gold-gradient-btn"
+                  disabled={onboardInvestorMut.isPending || !onboardUserId}
+                  onClick={() => onboardInvestorMut.mutate()}
+                >
+                  {onboardInvestorMut.isPending ? "Onboarding..." : "Confirm Onboarding"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* ACTIVATE CAPITAL DIALOG */}
+          <Dialog open={isActivateCapitalOpen} onOpenChange={setIsActivateCapitalOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" className="gold-gradient-btn text-xs h-8">
+                <ArrowDownLeft className="h-3.5 w-3.5 mr-1" /> Activate Capital
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="text-foreground">Activate Investor Capital</DialogTitle>
+                <DialogDescription>
+                  Confirm and post an incoming deposit event into the immutable financial ledger.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="investor" className="text-xs text-muted-foreground">Investor Account</Label>
+                  <Select value={selectedInvestorId} onValueChange={setSelectedInvestorId}>
+                    <SelectTrigger id="investor" className="bg-secondary/50 border-border">
+                      <SelectValue placeholder="Select investor..." />
+                    </SelectTrigger>
+                    <SelectContent className="bg-card border-border max-h-56">
+                      {investorsQ.data?.map((inv: any) => (
+                        <SelectItem key={inv.id} value={inv.id}>
+                          {inv.account_number} ({inv.users?.email || inv.user_id})
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="amount" className="text-xs text-muted-foreground">Amount</Label>
+                    <Input
+                      id="amount"
+                      type="number"
+                      step="any"
+                      placeholder="e.g. 10000"
+                      value={activateAmount}
+                      onChange={(e) => setActivateAmount(e.target.value)}
+                      className="bg-secondary/50 border-border focus-visible:ring-amber-400"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="currency" className="text-xs text-muted-foreground">Currency</Label>
+                    <Select value={activateCurrency} onValueChange={setActivateCurrency}>
+                      <SelectTrigger id="currency" className="bg-secondary/50 border-border">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-card border-border">
+                        <SelectItem value="USD">USD ($)</SelectItem>
+                        <SelectItem value="EUR">EUR (€)</SelectItem>
+                        <SelectItem value="GBP">GBP (£)</SelectItem>
+                        <SelectItem value="NGN">NGN (₦)</SelectItem>
+                      </SelectContent>
+                    </SelectContent>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="fx" className="text-xs text-muted-foreground">FX Rate to USD</Label>
+                    <Input
+                      id="fx"
+                      type="number"
+                      step="any"
+                      placeholder="1.0"
+                      value={activateFxRate}
+                      onChange={(e) => setActivateFxRate(e.target.value)}
+                      className="bg-secondary/50 border-border focus-visible:ring-amber-400"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="notes" className="text-xs text-muted-foreground">Notes / Ref</Label>
+                    <Input
+                      id="notes"
+                      placeholder="Bank wire / ref code"
+                      value={activateNotes}
+                      onChange={(e) => setActivateNotes(e.target.value)}
+                      className="bg-secondary/50 border-border focus-visible:ring-amber-400"
+                    />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsActivateCapitalOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="gold-gradient-btn"
+                  disabled={activateCapitalMutation.isPending || !selectedInvestorId || !activateAmount}
+                  onClick={() => activateCapitalMutation.mutate()}
+                >
+                  {activateCapitalMutation.isPending ? "Posting..." : "Confirm & Post to Ledger"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* CREATE CYCLE DIALOG */}
+          <Dialog open={isCreateCycleOpen} onOpenChange={setIsCreateCycleOpen}>
+            <DialogTrigger asChild>
+              <Button size="sm" variant="outline" className="border-border/80 bg-secondary/40 text-xs h-8">
+                <Plus className="h-3.5 w-3.5 mr-1" /> New Cycle
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="text-foreground">Create Investment Cycle</DialogTitle>
+                <DialogDescription>
+                  Configure a new trading period with authoritative profit splits.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="cname" className="text-xs text-muted-foreground">Cycle Name</Label>
+                  <Input
+                    id="cname"
+                    placeholder="e.g. Q4 Growth Cycle 2026"
+                    value={cycleName}
+                    onChange={(e) => setCycleName(e.target.value)}
+                    className="bg-secondary/50 border-border focus-visible:ring-amber-400"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="start" className="text-xs text-muted-foreground">Start Date</Label>
+                    <Input
+                      id="start"
+                      type="date"
+                      value={cycleStartDate}
+                      onChange={(e) => setCycleStartDate(e.target.value)}
+                      className="bg-secondary/50 border-border focus-visible:ring-amber-400"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="end" className="text-xs text-muted-foreground">End Date</Label>
+                    <Input
+                      id="end"
+                      type="date"
+                      value={cycleEndDate}
+                      onChange={(e) => setCycleEndDate(e.target.value)}
+                      className="bg-secondary/50 border-border focus-visible:ring-amber-400"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="isplit" className="text-xs text-muted-foreground">Investor Split (%)</Label>
+                    <Input
+                      id="isplit"
+                      type="number"
+                      value={cycleInvestorSplit}
+                      onChange={(e) => setCycleInvestorSplit(e.target.value)}
+                      className="bg-secondary/50 border-border focus-visible:ring-amber-400"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="csplit" className="text-xs text-muted-foreground">Company Split (%)</Label>
+                    <Input
+                      id="csplit"
+                      type="number"
+                      value={cycleCompanySplit}
+                      onChange={(e) => setCycleCompanySplit(e.target.value)}
+                      className="bg-secondary/50 border-border focus-visible:ring-amber-400"
+                    />
+                  </div>
+                </div>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsCreateCycleOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  className="gold-gradient-btn"
+                  disabled={createCycleMutation.isPending}
+                  onClick={() => createCycleMutation.mutate()}
+                >
+                  {createCycleMutation.isPending ? "Creating..." : "Create Cycle"}
                 </Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
         </div>
       </div>
-    </div>
 
-      {/* METRIC OVERVIEW CARDS */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Total Economic Equity</CardTitle>
-            <DollarSign className="h-4 w-4 text-primary" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${totalEquity.toLocaleString("en-US", { minimumFractionDigits: 2 })}</div>
-            <p className="text-xs text-muted-foreground mt-1">Across {s?.total_investors ?? 0} investor accounts</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Available Capital</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-emerald-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-              ${totalAvailable.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+      {/* 2. RECONCILIATION SUMMARY ALERT */}
+      {reconciliationQ.data && (
+        <div
+          className={`rounded-xl border p-4 flex items-center justify-between ${
+            reconciliationQ.data.length === 0
+              ? "border-emerald-500/30 bg-emerald-500/5 text-emerald-400"
+              : "border-amber-500/30 bg-amber-500/5 text-amber-400"
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            {reconciliationQ.data.length === 0 ? (
+              <CheckCircle2 className="h-5 w-5 shrink-0" />
+            ) : (
+              <AlertTriangle className="h-5 w-5 shrink-0" />
+            )}
+            <div>
+              <div className="text-xs font-bold uppercase tracking-wider">
+                Financial Ledger Reconciliation Status:{" "}
+                {reconciliationQ.data.length === 0 ? "100% BALANCED" : `${reconciliationQ.data.length} INVARIANTS FLAGGED`}
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {reconciliationQ.data.length === 0
+                  ? "All double-entry invariants, snapshot participations, and ledger entries are mathematically verified."
+                  : "Review discrepancy details in the Reconciliation tab immediately."}
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Uncommitted liquidity</p>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => setActiveTab("reconciliation")}
+            className="text-xs border-border/80 text-foreground"
+          >
+            Inspect Engine
+          </Button>
+        </div>
+      )}
+
+      {/* 3. HERO METRICS BAR */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="bg-card/60 border-border/70">
+          <CardHeader className="p-4 pb-1">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Total Economic Pool
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-1">
+            <div className="text-xl sm:text-2xl font-bold font-mono text-foreground">
+              ${totalEquity.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              Available: ${totalAvailable.toLocaleString("en-US", { minimumFractionDigits: 0 })}
+            </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Committed in Trades</CardTitle>
-            <Lock className="h-4 w-4 text-amber-500" />
+        <Card className="bg-card/60 border-border/70">
+          <CardHeader className="p-4 pb-1">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Committed in Trades
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-amber-600 dark:text-amber-400">
+          <CardContent className="p-4 pt-1">
+            <div className="text-xl sm:text-2xl font-bold font-mono text-amber-400">
               ${totalCommitted.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">{s?.open_trades_count ?? 0} active open trades</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {cs?.open_trades_count ?? 0} active trade executions
+            </p>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2 space-y-0">
-            <CardTitle className="text-sm font-medium text-muted-foreground">Company Share</CardTitle>
-            <TrendingUp className="h-4 w-4 text-indigo-500" />
+        <Card className="bg-card/60 border-border/70">
+          <CardHeader className="p-4 pb-1">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Realized P&L
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
-              ${companyProfitShare.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+          <CardContent className="p-4 pt-1">
+            <div className={`text-xl sm:text-2xl font-bold font-mono ${totalNetPnl >= 0 ? "text-emerald-400" : "text-rose-400"}`}>
+              {totalNetPnl >= 0 ? "+" : ""}${totalNetPnl.toLocaleString("en-US", { minimumFractionDigits: 2 })}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">Realized company profit fee</p>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {cs?.closed_trades_count ?? 0} closed trades
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="bg-card/60 border-border/70">
+          <CardHeader className="p-4 pb-1">
+            <CardTitle className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
+              Company Profit Share
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-1">
+            <div className="text-xl sm:text-2xl font-bold font-mono text-foreground">
+              ${pendingCompanyCut.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+            </div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">
+              {activeInvestorsCount} active investor accounts
+            </p>
           </CardContent>
         </Card>
       </div>
 
-      {/* TABS SECTIONS */}
-      <Tabs defaultValue="investors" className="space-y-4">
-        <TabsList className="grid grid-cols-3 sm:grid-cols-7 w-full">
-          <TabsTrigger value="investors">Investors</TabsTrigger>
-          <TabsTrigger value="capital">Capital</TabsTrigger>
-          <TabsTrigger value="cycles">Cycles</TabsTrigger>
-          <TabsTrigger value="withdrawals">Withdrawals</TabsTrigger>
-          <TabsTrigger value="ledger">Ledger</TabsTrigger>
-          <TabsTrigger value="reconciliation">Reconciliation</TabsTrigger>
-          <TabsTrigger value="audit">Audit Log</TabsTrigger>
-        </TabsList>
+      {/* 4. PRIMARY NAVIGATION TABS */}
+      <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="space-y-4">
+        <div className="border-b border-border/70 pb-2">
+          <TabsList className="bg-secondary/40 border border-border/60 flex-wrap h-auto p-1 gap-1">
+            <TabsTrigger value="overview" className="text-xs data-[state=active]:text-amber-400">
+              Overview
+            </TabsTrigger>
+            <TabsTrigger value="investors" className="text-xs data-[state=active]:text-amber-400">
+              Investors ({investorsQ.data?.length ?? 0})
+            </TabsTrigger>
+            <TabsTrigger value="capital" className="text-xs data-[state=active]:text-amber-400">
+              Capital Events ({capitalEventsQ.data?.length ?? 0})
+            </TabsTrigger>
+            <TabsTrigger value="cycles" className="text-xs data-[state=active]:text-amber-400">
+              Cycles ({cyclesQ.data?.length ?? 0})
+            </TabsTrigger>
+            <TabsTrigger value="withdrawals" className="text-xs data-[state=active]:text-amber-400">
+              Withdrawals ({withdrawalsQ.data?.length ?? 0})
+            </TabsTrigger>
+            <TabsTrigger value="ledger" className="text-xs data-[state=active]:text-amber-400">
+              Ledger
+            </TabsTrigger>
+            <TabsTrigger value="reconciliation" className="text-xs data-[state=active]:text-amber-400">
+              Reconciliation
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="text-xs data-[state=active]:text-amber-400">
+              Audit Trail
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
-        {/* INVESTORS TAB */}
+        {/* TAB 1: OVERVIEW */}
+        <TabsContent value="overview" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card className="bg-card/60 border-border/70">
+              <CardHeader>
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <Sliders className="h-4 w-4 text-amber-400" /> Active Platform Configuration
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-xs">
+                <div className="flex justify-between py-1 border-b border-border/60">
+                  <span className="text-muted-foreground">Config Version</span>
+                  <span className="font-mono font-bold text-foreground">v{cfg?.version ?? "1"}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-border/60">
+                  <span className="text-muted-foreground">Base Currency</span>
+                  <span className="font-mono font-bold text-foreground">{cfg?.base_currency ?? "USD"}</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-border/60">
+                  <span className="text-muted-foreground">Investor Profit Share</span>
+                  <span className="font-mono font-bold text-amber-400">{cfg?.investor_profit_share_pct ?? 70}%</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-border/60">
+                  <span className="text-muted-foreground">Company Profit Share</span>
+                  <span className="font-mono font-bold text-foreground">{cfg?.company_profit_share_pct ?? 30}%</span>
+                </div>
+                <div className="flex justify-between py-1 border-b border-border/60">
+                  <span className="text-muted-foreground">Risk Basis Architecture</span>
+                  <span className="font-mono text-emerald-400 font-bold">{cfg?.risk_basis ?? "FIXED_PERCENTAGE"}</span>
+                </div>
+                <div className="flex justify-between py-1">
+                  <span className="text-muted-foreground">Loss Allocation Policy</span>
+                  <span className="font-mono text-muted-foreground">100% Investor Pool / $0 Company Deducted</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-card/60 border-border/70">
+              <CardHeader>
+                <CardTitle className="text-sm font-bold flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4 text-amber-400" /> Operating Architecture & Invariants
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-2 text-xs text-muted-foreground leading-relaxed">
+                <p>• <span className="text-foreground font-semibold">Immutable Financial Ledger:</span> No balance is ever directly updated. All balances are derived exclusively from ledger event aggregations.</p>
+                <p>• <span className="text-foreground font-semibold">Execution-Time Snapshots:</span> When a trade is executed, investor capital snapshots are locked idempotently.</p>
+                <p>• <span className="text-foreground font-semibold">70/30 Profit Allocation:</span> Realized gains are split 70% to investors and 30% to the company cut via atomic database triggers.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* TAB 2: INVESTORS */}
         <TabsContent value="investors" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-base">Investor Accounts</CardTitle>
-                <CardDescription>Governed investor profiles and current active status.</CardDescription>
-              </div>
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-bold text-foreground">Registered Investor Profiles</h3>
+            <Button size="sm" onClick={() => setIsOnboardOpen(true)} className="gold-gradient-btn text-xs h-8">
+              <UserPlus className="h-3.5 w-3.5 mr-1" /> Onboard Investor
+            </Button>
+          </div>
 
-              <Dialog open={isOnboardOpen} onOpenChange={setIsOnboardOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm" className="gold-gradient-btn text-xs">
-                    <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Onboard Investor
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md bg-card border-border">
-                  <DialogHeader>
-                    <DialogTitle className="text-foreground">Onboard New Investor</DialogTitle>
-                    <DialogDescription>
-                      Create a governed investor account identity for an authenticated user.
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-3">
-                    <div className="space-y-1.5">
-                      <Label className="text-xs text-muted-foreground">Select User</Label>
-                      <select
-                        className="w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm text-foreground focus-visible:ring-1 focus-visible:ring-amber-400"
-                        value={onboardUserId}
-                        onChange={(e) => setOnboardUserId(e.target.value)}
+          <div className="rounded-xl border border-border/70 overflow-hidden bg-card/60">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-secondary/40 border-b border-border text-muted-foreground uppercase font-mono text-[10px]">
+                <tr>
+                  <th className="p-3">Account #</th>
+                  <th className="p-3">User / Email</th>
+                  <th className="p-3">Currency</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Onboarded</th>
+                  <th className="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60 font-mono">
+                {investorsQ.data?.map((inv: any) => (
+                  <tr key={inv.id} className="hover:bg-secondary/20">
+                    <td className="p-3 font-bold text-foreground">{inv.account_number}</td>
+                    <td className="p-3 font-sans text-muted-foreground">{inv.users?.email || inv.user_id}</td>
+                    <td className="p-3 text-foreground">{inv.currency}</td>
+                    <td className="p-3">
+                      <Badge variant={inv.status === "ACTIVE" ? "default" : "outline"} className="text-[10px]">
+                        {inv.status}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-muted-foreground text-[11px]">
+                      {new Date(inv.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="p-3 text-right">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-7 text-xs text-amber-400 hover:text-amber-300"
+                        onClick={() => {
+                          setSelectedInvestorId(inv.id);
+                          setIsActivateCapitalOpen(true);
+                        }}
                       >
-                        <option value="">-- Choose User Identity --</option>
-                        {eligibleUsersQ.data?.map((u: any) => (
-                          <option key={u.user_id} value={u.user_id}>
-                            {u.email || u.user_id} ({u.subscription_tier || "PRO"})
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Base Currency</Label>
-                        <select
-                          className="w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm text-foreground focus-visible:ring-1 focus-visible:ring-amber-400"
-                          value={onboardCurrency}
-                          onChange={(e) => setOnboardCurrency(e.target.value)}
-                        >
-                          <option value="USD">USD ($)</option>
-                          <option value="EUR">EUR (€)</option>
-                          <option value="GBP">GBP (£)</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground">Account # (Optional)</Label>
-                        <Input
-                          placeholder="Auto-generated if blank"
-                          value={onboardAccountNum}
-                          onChange={(e) => setOnboardAccountNum(e.target.value)}
-                          className="bg-secondary/50 border-border text-xs"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsOnboardOpen(false)}>
-                      Cancel
-                    </Button>
-                    <Button
-                      className="gold-gradient-btn"
-                      disabled={onboardInvestorMut.isPending || !onboardUserId}
-                      onClick={() => onboardInvestorMut.mutate()}
-                    >
-                      {onboardInvestorMut.isPending ? "Creating..." : "Onboard Account"}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-muted-foreground">
-                      <th className="py-2 px-3">Account Number</th>
-                      <th className="py-2 px-3">User Email</th>
-                      <th className="py-2 px-3">Status</th>
-                      <th className="py-2 px-3">Base Currency</th>
-                      <th className="py-2 px-3">Created At</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {investorsQ.data?.map((inv: any) => (
-                      <tr key={inv.id} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="py-2 px-3 font-mono font-semibold">{inv.account_number}</td>
-                        <td className="py-2 px-3">{inv.users?.email || inv.user_id}</td>
-                        <td className="py-2 px-3">
-                          <Badge variant={inv.status === "ACTIVE" ? "default" : "secondary"}>
-                            {inv.status}
-                          </Badge>
-                        </td>
-                        <td className="py-2 px-3">{inv.currency ?? "USD"}</td>
-                        <td className="py-2 px-3 text-muted-foreground">
-                          {new Date(inv.created_at).toLocaleDateString()}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+                        + Add Capital
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </TabsContent>
 
-        {/* CAPITAL EVENTS TAB */}
+        {/* TAB 3: CAPITAL EVENTS */}
         <TabsContent value="capital" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Multi-Currency Capital Events</CardTitle>
-              <CardDescription>Authoritative deposit and activation records with FX audit traceability.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-muted-foreground">
-                      <th className="py-2 px-3">Date</th>
-                      <th className="py-2 px-3">Account</th>
-                      <th className="py-2 px-3">Event Type</th>
-                      <th className="py-2 px-3">Nominal Amount</th>
-                      <th className="py-2 px-3">FX Rate</th>
-                      <th className="py-2 px-3">Base USD</th>
-                      <th className="py-2 px-3">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {capitalEventsQ.data?.map((ce: any) => (
-                      <tr key={ce.id} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="py-2 px-3 text-muted-foreground">{new Date(ce.created_at).toLocaleDateString()}</td>
-                        <td className="py-2 px-3 font-mono">{ce.investor_accounts?.account_number || "—"}</td>
-                        <td className="py-2 px-3">{ce.event_type}</td>
-                        <td className="py-2 px-3 font-mono font-semibold">
-                          {Number(ce.original_amount || ce.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {ce.original_currency || ce.currency}
-                        </td>
-                        <td className="py-2 px-3 font-mono text-xs text-muted-foreground">
-                          {Number(ce.exchange_rate_to_usd || 1).toFixed(6)}
-                        </td>
-                        <td className="py-2 px-3 font-mono font-bold text-primary">
-                          ${Number(ce.base_amount_usd || ce.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-2 px-3">
-                          <Badge variant={ce.status === "ACTIVATED" ? "default" : "secondary"}>
-                            {ce.status}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-bold text-foreground">Capital Events & Deposits</h3>
+            <Button size="sm" onClick={() => setIsActivateCapitalOpen(true)} className="gold-gradient-btn text-xs h-8">
+              <ArrowDownLeft className="h-3.5 w-3.5 mr-1" /> Activate Capital
+            </Button>
+          </div>
+
+          <div className="rounded-xl border border-border/70 overflow-hidden bg-card/60">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-secondary/40 border-b border-border text-muted-foreground uppercase font-mono text-[10px]">
+                <tr>
+                  <th className="p-3">Account</th>
+                  <th className="p-3">Event Type</th>
+                  <th className="p-3">Amount</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Timestamp</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60 font-mono">
+                {capitalEventsQ.data?.map((ce: any) => (
+                  <tr key={ce.id} className="hover:bg-secondary/20">
+                    <td className="p-3 font-bold text-foreground">{ce.investor_accounts?.account_number || ce.investor_id}</td>
+                    <td className="p-3 text-muted-foreground">{ce.event_type}</td>
+                    <td className="p-3 font-bold text-foreground">
+                      ${Number(ce.base_amount_usd || ce.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {ce.currency}
+                    </td>
+                    <td className="p-3">
+                      <Badge variant={ce.status === "ACTIVATED" ? "default" : "outline"} className="text-[10px]">
+                        {ce.status}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-muted-foreground text-[11px]">
+                      {new Date(ce.created_at).toLocaleString()}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </TabsContent>
 
-        {/* CYCLES TAB */}
+        {/* TAB 4: CYCLES */}
         <TabsContent value="cycles" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-base">Investment Cycles</CardTitle>
-                <CardDescription>Governing terms and historical split snapshots.</CardDescription>
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-bold text-foreground">Investment Cycles</h3>
+            <Button size="sm" onClick={() => setIsCreateCycleOpen(true)} className="gold-gradient-btn text-xs h-8">
+              <Plus className="h-3.5 w-3.5 mr-1" /> Create Cycle
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {cyclesQ.data?.map((c: any) => (
+              <Card key={c.id} className="bg-card/60 border-border/70 p-4 space-y-3">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <h4 className="text-sm font-bold text-foreground">{c.name}</h4>
+                    <p className="text-xs text-muted-foreground font-mono">
+                      Cycle #{c.cycle_number} · {c.start_date} to {c.end_date}
+                    </p>
+                  </div>
+                  <Badge variant={c.status === "ACTIVE" ? "default" : c.status === "SETTLED" ? "secondary" : "outline"}>
+                    {c.status}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs border-y border-border/60 py-2 font-mono">
+                  <div>
+                    <span className="text-muted-foreground">Investor Split:</span> {c.investor_profit_share_pct}%
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Company Split:</span> {c.company_profit_share_pct}%
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-1">
+                  {c.status === "DRAFT" && (
+                    <Button
+                      size="sm"
+                      onClick={() => activateCycleMutation.mutate(c.id)}
+                      disabled={activateCycleMutation.isPending}
+                      className="gold-gradient-btn text-xs h-7"
+                    >
+                      Activate Cycle
+                    </Button>
+                  )}
+                  {c.status === "ACTIVE" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => closeCycleMutation.mutate(c.id)}
+                      disabled={closeCycleMutation.isPending}
+                      className="border-rose-500/30 text-rose-400 hover:bg-rose-500/10 text-xs h-7"
+                    >
+                      Close & Settle Cycle
+                    </Button>
+                  )}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </TabsContent>
+
+        {/* TAB 5: WITHDRAWALS */}
+        <TabsContent value="withdrawals" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-bold text-foreground">Withdrawal Requests Queue</h3>
+          </div>
+
+          <div className="rounded-xl border border-border/70 overflow-hidden bg-card/60">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-secondary/40 border-b border-border text-muted-foreground uppercase font-mono text-[10px]">
+                <tr>
+                  <th className="p-3">Account</th>
+                  <th className="p-3">Amount</th>
+                  <th className="p-3">Status</th>
+                  <th className="p-3">Requested Date</th>
+                  <th className="p-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60 font-mono">
+                {withdrawalsQ.data?.map((w: any) => (
+                  <tr key={w.id} className="hover:bg-secondary/20">
+                    <td className="p-3 font-bold text-foreground">{w.investor_accounts?.account_number || w.investor_id}</td>
+                    <td className="p-3 font-bold text-foreground">
+                      ${Number(w.requested_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="p-3">
+                      <Badge
+                        variant={
+                          w.status === "PROCESSED"
+                            ? "default"
+                            : w.status === "APPROVED"
+                              ? "outline"
+                              : w.status === "REJECTED"
+                                ? "destructive"
+                                : "secondary"
+                        }
+                        className="text-[10px]"
+                      >
+                        {w.status}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-muted-foreground text-[11px]">
+                      {new Date(w.created_at).toLocaleDateString()}
+                    </td>
+                    <td className="p-3 text-right space-x-1.5">
+                      {w.status === "REQUESTED" && (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs border-emerald-500/30 text-emerald-400 hover:bg-emerald-400/10"
+                            onClick={() => approveWithdrawalMutation.mutate(w.id)}
+                            disabled={approveWithdrawalMutation.isPending}
+                          >
+                            Approve
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 text-xs border-rose-500/30 text-rose-400 hover:bg-rose-500/10"
+                            onClick={() => {
+                              setSelectedWithdrawalId(w.id);
+                              setIsRejectOpen(true);
+                            }}
+                          >
+                            Reject
+                          </Button>
+                        </>
+                      )}
+                      {w.status === "APPROVED" && (
+                        <Button
+                          size="sm"
+                          className="gold-gradient-btn h-7 text-xs"
+                          onClick={() => settleWithdrawalMutation.mutate(w.id)}
+                          disabled={settleWithdrawalMutation.isPending}
+                        >
+                          Disburse / Settle
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* REJECT WITHDRAWAL DIALOG */}
+          <Dialog open={isRejectOpen} onOpenChange={setIsRejectOpen}>
+            <DialogContent className="sm:max-w-md bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="text-foreground">Reject Withdrawal Request</DialogTitle>
+                <DialogDescription>
+                  Enter an administrative reason for rejecting this withdrawal request.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="rej-reason" className="text-xs text-muted-foreground">Rejection Reason</Label>
+                  <Input
+                    id="rej-reason"
+                    placeholder="e.g. Account verification required / Invalid address"
+                    value={rejectReason}
+                    onChange={(e) => setRejectReason(e.target.value)}
+                    className="bg-secondary/50 border-border focus-visible:ring-amber-400"
+                  />
+                </div>
               </div>
-              <Dialog open={isCycleOpen} onOpenChange={setIsCycleOpen}>
-                <DialogTrigger asChild>
-                  <Button size="sm"><PlusCircle className="h-4 w-4 mr-1" /> New Cycle</Button>
-                </DialogTrigger>
-                <DialogContent className="sm:max-w-md">
-                  <DialogHeader>
-                    <DialogTitle>Create Investment Cycle</DialogTitle>
-                    <DialogDescription>Define governing profit-share terms for the cycle.</DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4 py-3">
-                    <div className="space-y-1">
-                      <Label>Cycle Name</Label>
-                      <Input placeholder="Q4 2026 Strategy Cycle" value={cycleName} onChange={(e) => setCycleName(e.target.value)} />
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsRejectOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={rejectWithdrawalMutation.isPending || !rejectReason}
+                  onClick={() => rejectWithdrawalMutation.mutate()}
+                >
+                  {rejectWithdrawalMutation.isPending ? "Rejecting..." : "Confirm Rejection"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </TabsContent>
+
+        {/* TAB 6: LEDGER */}
+        <TabsContent value="ledger" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-bold text-foreground">Immutable Financial Ledger Entries (Last 100)</h3>
+          </div>
+
+          <div className="rounded-xl border border-border/70 overflow-hidden bg-card/60">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-secondary/40 border-b border-border text-muted-foreground uppercase font-mono text-[10px]">
+                <tr>
+                  <th className="p-3">Timestamp</th>
+                  <th className="p-3">Account</th>
+                  <th className="p-3">Event Type</th>
+                  <th className="p-3">Amount (USD)</th>
+                  <th className="p-3">Running Balance</th>
+                  <th className="p-3">Description</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60 font-mono">
+                {ledgerQ.data?.map((l: any) => {
+                  const amt = Number(l.amount);
+                  const isPositive = amt >= 0;
+
+                  return (
+                    <tr key={l.id} className="hover:bg-secondary/20">
+                      <td className="p-3 text-muted-foreground text-[11px]">
+                        {new Date(l.created_at).toLocaleString()}
+                      </td>
+                      <td className="p-3 font-bold text-foreground">{l.investor_accounts?.account_number || l.investor_id}</td>
+                      <td className="p-3 text-muted-foreground">{l.event_type}</td>
+                      <td className={`p-3 font-bold ${isPositive ? "text-emerald-400" : "text-rose-400"}`}>
+                        {isPositive ? "+" : ""}${amt.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="p-3 font-bold text-amber-400">
+                        ${Number(l.running_balance_after ?? 0).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="p-3 font-sans text-muted-foreground text-[11px] truncate max-w-xs">
+                        {l.description}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+
+        {/* TAB 7: RECONCILIATION */}
+        <TabsContent value="reconciliation" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <div>
+              <h3 className="text-sm font-bold text-foreground">Double-Entry Reconciliation Engine</h3>
+              <p className="text-xs text-muted-foreground">Real-time evaluation of all 16 platform accounting invariants.</p>
+            </div>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => reconciliationQ.refetch()}
+              className="text-xs border-border/80 h-8"
+            >
+              <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Re-evaluate Invariants
+            </Button>
+          </div>
+
+          {!reconciliationQ.data || reconciliationQ.data.length === 0 ? (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/5 p-8 text-center space-y-2">
+              <CheckCircle2 className="h-8 w-8 text-emerald-400 mx-auto" />
+              <h4 className="text-sm font-bold text-foreground">Zero Accounting Discrepancies</h4>
+              <p className="text-xs text-muted-foreground max-w-md mx-auto">
+                All capital allocations, trade snapshots, realized profit splits, and withdrawal ledger entries match system invariants.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {reconciliationQ.data.map((r: ReconciliationCheck, idx: number) => (
+                <div key={idx} className="p-4 rounded-xl border border-rose-500/30 bg-rose-500/5 flex justify-between items-center">
+                  <div>
+                    <div className="text-xs font-bold text-rose-400 font-mono">
+                      [{r.check_code}] {r.check_name}
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label>Start Date</Label>
-                        <Input type="date" value={cycleStartDate} onChange={(e) => setCycleStartDate(e.target.value)} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>End Date</Label>
-                        <Input type="date" value={cycleEndDate} onChange={(e) => setCycleEndDate(e.target.value)} />
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="space-y-1">
-                        <Label>Investor Share (%)</Label>
-                        <Input type="number" value={cycleInvestorSplit} onChange={(e) => setCycleInvestorSplit(e.target.value)} />
-                      </div>
-                      <div className="space-y-1">
-                        <Label>Company Share (%)</Label>
-                        <Input type="number" value={cycleCompanySplit} onChange={(e) => setCycleCompanySplit(e.target.value)} />
-                      </div>
+                    <div className="text-xs text-muted-foreground mt-0.5">
+                      Discrepancies: <span className="font-bold text-foreground">{r.discrepancy_count}</span> · Severity: {r.severity}
                     </div>
                   </div>
-                  <DialogFooter>
-                    <Button variant="outline" onClick={() => setIsCycleOpen(false)}>Cancel</Button>
-                    <Button disabled={createCycleMut.isPending} onClick={() => createCycleMut.mutate()}>
-                      {createCycleMut.isPending ? "Creating..." : "Create Cycle"}
-                    </Button>
-                  </DialogFooter>
-                </DialogContent>
-              </Dialog>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-muted-foreground">
-                      <th className="py-2 px-3">Cycle Name</th>
-                      <th className="py-2 px-3">Start Date</th>
-                      <th className="py-2 px-3">End Date</th>
-                      <th className="py-2 px-3">Investor Split</th>
-                      <th className="py-2 px-3">Company Split</th>
-                      <th className="py-2 px-3">Status</th>
-                      <th className="py-2 px-3">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {cyclesQ.data?.map((c: any) => (
-                      <tr key={c.id} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="py-2 px-3 font-semibold">{c.cycle_name}</td>
-                        <td className="py-2 px-3 text-muted-foreground">{new Date(c.start_date).toLocaleDateString()}</td>
-                        <td className="py-2 px-3 text-muted-foreground">{new Date(c.end_date).toLocaleDateString()}</td>
-                        <td className="py-2 px-3 font-mono font-bold text-primary">{c.profit_split_investor_pct}%</td>
-                        <td className="py-2 px-3 font-mono font-bold text-indigo-500">{c.profit_split_company_pct}%</td>
-                        <td className="py-2 px-3">
-                          <Badge variant={c.status === "ACTIVE" ? "default" : "secondary"}>
-                            {c.status}
-                          </Badge>
-                        </td>
-                        <td className="py-2 px-3">
-                          {c.status === "UPCOMING" && (\n                            <Button\n                              size=\"sm\"\n                              variant=\"outline\"\n                              onClick={async () => {\n                                await activateInvestmentCycle(c.id);\n                                toast.success(`Cycle ${c.cycle_name} activated.`);\n                                qc.invalidateQueries({ queryKey: [\"admin\", \"cycles\"] });\n                              }}\n                            >\n                              Activate\n                            </Button>\n                          )}\n                          {c.status === \"ACTIVE\" && (\n                            <Button\n                              size=\"sm\"\n                              variant=\"outline\"\n                              onClick={async () => {\n                                await closeInvestmentCycle(c.id);\n                                toast.success(`Cycle ${c.cycle_name} closed.`);\n                                qc.invalidateQueries({ queryKey: [\"admin\", \"cycles\"] });\n                              }}\n                            >\n                              Close\n                            </Button>\n                          )}\n                        </td>\n                      </tr>\n                    ))}\n                  </tbody>\n                </table>\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>\n\n        {/* WITHDRAWALS TAB */}\n        <TabsContent value=\"withdrawals\" className=\"space-y-4\">\n          <Card>\n            <CardHeader>\n              <CardTitle className=\"text-base\">Withdrawal Request Management</CardTitle>\n              <CardDescription>Controlled review, approval, and settlement workflows.</CardDescription>\n            </CardHeader>\n            <CardContent>\n              <div className=\"overflow-x-auto\">\n                <table className=\"w-full text-left text-sm\">\n                  <thead>\n                    <tr className=\"border-b border-border text-muted-foreground\">\n                      <th className=\"py-2 px-3\">Requested At</th>\n                      <th className=\"py-2 px-3\">Account</th>\n                      <th className=\"py-2 px-3\">Amount ($ USD)</th>\n                      <th className=\"py-2 px-3\">Status</th>\n                      <th className=\"py-2 px-3\">Actions</th>\n                    </tr>\n                  </thead>\n                  <tbody>\n                    {withdrawalsQ.data?.map((w: any) => (\n                      <tr key={w.id} className=\"border-b border-border/50 hover:bg-muted/30\">\n                        <td className=\"py-2 px-3 text-muted-foreground\">{new Date(w.created_at).toLocaleDateString()}</td>\n                        <td className=\"py-2 px-3 font-mono\">{w.investor_accounts?.account_number || \"—\"}</td>\n                        <td className=\"py-2 px-3 font-mono font-bold\">${Number(w.requested_amount).toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}</td>\n                        <td className=\"py-2 px-3\">\n                          <Badge\n                            variant={\n                              w.status === \"PROCESSED\"\n                                ? \"default\"\n                                : w.status === \"APPROVED\"\n                                ? \"outline\"\n                                : w.status === \"REJECTED\" || w.status === \"CANCELLED\"\n                                ? \"destructive\"\n                                : \"secondary\"\n                            }\n                          >\n                            {w.status}\n                          </Badge>\n                        </td>\n                        <td className=\"py-2 px-3 flex gap-2\">\n                          {w.status === \"REQUESTED\" && (\n                            <>\n                              <Button\n                                size=\"sm\"\n                                variant=\"outline\"\n                                onClick={async () => {\n                                  try {\n                                    await approveWithdrawal(w.id);\n                                    toast.success(\"Withdrawal approved.\");\n                                    qc.invalidateQueries({ queryKey: [\"admin\"] });\n                                  } catch (e: any) {\n                                    toast.error(e?.message || \"Failed to approve.\");\n                                  }\n                                }}\n                              >\n                                Approve\n                              </Button>\n                              <Button\n                                size=\"sm\"\n                                variant=\"destructive\"\n                                onClick={async () => {\n                                  try {\n                                    await rejectWithdrawal(w.id, \"Admin rejection\");\n                                    toast.success(\"Withdrawal rejected.\");\n                                    qc.invalidateQueries({ queryKey: [\"admin\"] });\n                                  } catch (e: any) {\n                                    toast.error(e?.message || \"Failed to reject.\");\n                                  }\n                                }}\n                              >\n                                Reject\n                              </Button>\n                            </>\n                          )}\n                          {w.status === \"APPROVED\" && (\n                            <Button\n                              size=\"sm\"\n                              onClick={async () => {\n                                try {\n                                  await settleWithdrawal(w.id, \"BANK_TRANSFER_COMPLETED\");\n                                  toast.success(\"Withdrawal settled and ledger payout posted.\");\n                                  qc.invalidateQueries({ queryKey: [\"admin\"] });\n                                } catch (e: any) {\n                                  toast.error(e?.message || \"Failed to settle.\");\n                                }\n                              }}\n                            >\n                              Settle Payout\n                            </Button>\n                          )}\n                        </td>\n                      </tr>\n                    ))}\n                  </tbody>\n                </table>\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>\n\n        {/* FINANCIAL LEDGER TAB */}\n        <TabsContent value=\"ledger\" className=\"space-y-4\">\n          <Card>\n            <CardHeader>\n              <CardTitle className=\"text-base\">Immutable Financial Ledger</CardTitle>\n              <CardDescription>Append-only audit trail protected by database engine mutation triggers.</CardDescription>\n            </CardHeader>\n            <CardContent>\n              <div className=\"overflow-x-auto\">\n                <table className=\"w-full text-left text-sm\">\n                  <thead>\n                    <tr className=\"border-b border-border text-muted-foreground\">\n                      <th className=\"py-2 px-3\">Timestamp</th>\n                      <th className=\"py-2 px-3\">Account</th>\n                      <th className=\"py-2 px-3\">Event Type</th>\n                      <th className=\"py-2 px-3\">Base Amount ($ USD)</th>\n                      <th className=\"py-2 px-3\">Description</th>\n                      <th className=\"py-2 px-3\">Idempotency Key</th>\n                    </tr>\n                  </thead>\n                  <tbody>\n                    {ledgerQ.data?.map((l: any) => (\n                      <tr key={l.id} className=\"border-b border-border/50 hover:bg-muted/30\">\n                        <td className=\"py-2 px-3 text-muted-foreground text-xs\">{new Date(l.created_at).toLocaleString()}</td>\n                        <td className=\"py-2 px-3 font-mono\">{l.investor_accounts?.account_number || \"—\"}</td>\n                        <td className=\"py-2 px-3\">\n                          <Badge variant=\"outline\">{l.event_type}</Badge>\n                        </td>\n                        <td className={`py-2 px-3 font-mono font-bold ${Number(l.amount) >= 0 ? \"text-emerald-500\" : \"text-rose-500\"}`}>\n                          {Number(l.amount) >= 0 ? \"+\" : \"\"}${Number(l.amount).toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}\n                        </td>\n                        <td className=\"py-2 px-3 text-xs max-w-sm truncate\">{l.description}</td>\n                        <td className=\"py-2 px-3 font-mono text-xs text-muted-foreground truncate max-w-xs\">{l.idempotency_key}</td>\n                      </tr>\n                    ))}\n                  </tbody>\n                </table>\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>\n\n        {/* RECONCILIATION TAB */}\n        <TabsContent value=\"reconciliation\" className=\"space-y-4\">\n          <Card>\n            <CardHeader className=\"flex flex-row items-center justify-between\">\n              <div>\n                <CardTitle className=\"text-base\">16-Point Financial Invariant Reconciliation</CardTitle>\n                <CardDescription>Mathematical and structural invariant validator running on live engine.</CardDescription>\n              </div>\n              <Button size=\"sm\" variant=\"outline\" onClick={() => reconQ.refetch()}>\n                <RefreshCw className=\"h-4 w-4 mr-2\" /> Run Invariants\n              </Button>\n            </CardHeader>\n            <CardContent>\n              <div className=\"overflow-x-auto\">\n                <table className=\"w-full text-left text-sm\">\n                  <thead>\n                    <tr className=\"border-b border-border text-muted-foreground\">\n                      <th className=\"py-2 px-3\">Check Code</th>\n                      <th className=\"py-2 px-3\">Invariant Name</th>\n                      <th className=\"py-2 px-3\">Severity</th>\n                      <th className=\"py-2 px-3\">Discrepancies</th>\n                    </tr>\n                  </thead>\n                  <tbody>\n                    {reconQ.data?.map((rc: ReconciliationCheck, idx: number) => (\n                      <tr key={idx} className=\"border-b border-border/50 hover:bg-muted/30\">\n                        <td className=\"py-2 px-3 font-mono font-semibold\">{rc.check_code}</td>\n                        <td className=\"py-2 px-3\">{rc.check_name}</td>\n                        <td className=\"py-2 px-3\">\n                          <Badge variant={rc.severity === \"OK\" ? \"default\" : \"destructive\"}>\n                            {rc.severity}\n                          </Badge>\n                        </td>\n                        <td className={`py-2 px-3 font-mono font-bold ${rc.discrepancy_count === 0 ? \"text-emerald-500\" : \"text-rose-500\"}`}>\n                          {rc.discrepancy_count}\n                        </td>\n                      </tr>\n                    ))}\n                  </tbody>\n                </table>\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>\n\n        {/* AUDIT LOG TAB */}\n        <TabsContent value=\"audit\" className=\"space-y-4\">\n          <Card>\n            <CardHeader>\n              <CardTitle className=\"text-base\">Operational Audit Trail</CardTitle>\n              <CardDescription>Immutable activity trail of all administrative and financial actions.</CardDescription>\n            </CardHeader>\n            <CardContent>\n              <div className=\"overflow-x-auto\">\n                <table className=\"w-full text-left text-sm\">\n                  <thead>\n                    <tr className=\"border-b border-border text-muted-foreground\">\n                      <th className=\"py-2 px-3\">Timestamp</th>\n                      <th className=\"py-2 px-3\">Table</th>\n                      <th className=\"py-2 px-3\">Action</th>\n                      <th className=\"py-2 px-3\">Performed By</th>\n                      <th className=\"py-2 px-3\">Payload</th>\n                    </tr>\n                  </thead>\n                  <tbody>\n                    {auditLogsQ.data?.map((al: any) => (\n                      <tr key={al.id} className=\"border-b border-border/50 hover:bg-muted/30\">\n                        <td className=\"py-2 px-3 text-muted-foreground text-xs\">{new Date(al.created_at).toLocaleString()}</td>\n                        <td className=\"py-2 px-3 font-mono text-xs\">{al.table_name}</td>\n                        <td className=\"py-2 px-3\"><Badge variant=\"outline\">{al.action}</Badge></td>\n                        <td className=\"py-2 px-3 font-mono text-xs\">{al.performed_by || \"SYSTEM\"}</td>\n                        <td className=\"py-2 px-3 font-mono text-xs max-w-md truncate text-muted-foreground\">\n                          {JSON.stringify(al.payload)}\n                        </td>\n                      </tr>\n                    ))}\n                  </tbody>\n                </table>\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>\n      </Tabs>\n    </div>\n  );\n}\n
+                  <Badge variant="destructive" className="text-xs font-mono">
+                    ACTION REQUIRED
+                  </Badge>
+                </div>
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        {/* TAB 8: AUDIT TRAIL */}
+        <TabsContent value="audit" className="space-y-4">
+          <div className="flex justify-between items-center">
+            <h3 className="text-sm font-bold text-foreground">Immutable Audit Trail</h3>
+          </div>
+
+          <div className="rounded-xl border border-border/70 overflow-hidden bg-card/60">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-secondary/40 border-b border-border text-muted-foreground uppercase font-mono text-[10px]">
+                <tr>
+                  <th className="p-3">Timestamp</th>
+                  <th className="p-3">Table</th>
+                  <th className="p-3">Action</th>
+                  <th className="p-3">Performed By</th>
+                  <th className="p-3">Record ID</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60 font-mono">
+                {auditLogsQ.data?.map((a: any) => (
+                  <tr key={a.id} className="hover:bg-secondary/20">
+                    <td className="p-3 text-muted-foreground text-[11px]">
+                      {new Date(a.created_at).toLocaleString()}
+                    </td>
+                    <td className="p-3 font-bold text-foreground">{a.table_name}</td>
+                    <td className="p-3">
+                      <Badge variant="outline" className="text-[10px] text-amber-400 border-amber-400/30">
+                        {a.action}
+                      </Badge>
+                    </td>
+                    <td className="p-3 text-muted-foreground font-sans truncate max-w-xs">{a.performed_by || "SYSTEM"}</td>
+                    <td className="p-3 text-muted-foreground text-[11px] truncate max-w-xs">{a.record_id}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+}
