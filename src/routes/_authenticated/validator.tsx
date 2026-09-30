@@ -5,10 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
-  Plus,
-  BookOpen,
-  Sliders,
-  Sparkles,
   TrendingUp,
   BarChart3,
   Target,
@@ -16,6 +12,10 @@ import {
   Handshake,
   AlertTriangle,
   ChevronRight,
+  Sparkles,
+  Plus,
+  BookOpen,
+  Sliders,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/validator")({
@@ -80,17 +80,18 @@ function MetaValidatorPlatform() {
 
   return (
     <div className="space-y-6">
-      {/* 1. PLATFORM TITLE & SUPPORTING STATEMENT */}
+      {/* 1. PLATFORM IDENTITY & BANNER */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground font-sans">
           Meta Validator
         </h1>
+        {/* 2. SUPPORTING STATEMENT */}
         <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
-          Analyze. Execute. Improve.
+          Disciplined trading for real results.
         </p>
       </div>
 
-      {/* 2. HERO CARD — "Disciplined Trading for Real Results" */}
+      {/* HERO BANNER CARD */}
       <div className="relative overflow-hidden rounded-2xl gold-card-hero p-5 sm:p-7">
         <div className="flex items-center justify-between relative z-10">
           <div className="space-y-2 max-w-sm">
@@ -129,7 +130,6 @@ function MetaValidatorPlatform() {
               <circle cx="24" cy="36" r="3" fill="#D97706" />
               <circle cx="34" cy="42" r="3" fill="#D97706" />
               <circle cx="48" cy="22" r="4" fill="#FDE68A" />
-              {/* Bull horns geometric accent */}
               <path
                 d="M20 18C16 12 10 14 8 18C12 20 16 22 22 24"
                 stroke="#F59E0B"
@@ -147,89 +147,117 @@ function MetaValidatorPlatform() {
         </div>
       </div>
 
-      {/* 3. PRIMARY ACTION & SECONDARY MODULE CARDS (2x2 GRID) */}
-      <div className="grid grid-cols-2 gap-3 sm:gap-4">
-        {/* NEW TRADE */}
-        <Link
-          to="/trade-creator"
-          className="group relative flex flex-col justify-between rounded-xl border border-amber-500/30 bg-card/90 p-4 sm:p-5 transition-all duration-200 hover:border-amber-400 hover:bg-card hover:shadow-[0_4px_20px_rgba(245,158,11,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400 group-hover:scale-105 transition-transform">
-            <Plus className="h-5 w-5" />
-          </div>
-          <div className="mt-4">
-            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
-              New Trade
-            </h3>
-            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
-              Create & run a trade
-            </p>
-          </div>
-        </Link>
-
-        {/* JOURNAL */}
-        <Link
-          to="/journal"
-          className="group relative flex flex-col justify-between rounded-xl border border-border/80 bg-card/70 p-4 sm:p-5 transition-all duration-200 hover:border-border hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-foreground group-hover:scale-105 transition-transform">
-            <BookOpen className="h-4 w-4 text-amber-400" />
-          </div>
-          <div className="mt-4">
-            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
-              Journal
-            </h3>
-            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
-              Review your history
-            </p>
-          </div>
-        </Link>
-
-        {/* STRATEGY PROFILES */}
-        <Link
-          to="/strategy-profiles"
-          className="group relative flex flex-col justify-between rounded-xl border border-border/80 bg-card/70 p-4 sm:p-5 transition-all duration-200 hover:border-border hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-foreground group-hover:scale-105 transition-transform">
-            <Sliders className="h-4 w-4 text-amber-400" />
-          </div>
-          <div className="mt-4">
-            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
-              Strategy Profiles
-            </h3>
-            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
-              Manage strategies
-            </p>
-          </div>
-        </Link>
-
-        {/* TRADE ANALYSIS / AI VALIDATION */}
-        <Link
-          to="/journal"
-          className="group relative flex flex-col justify-between rounded-xl border border-border/80 bg-card/70 p-4 sm:p-5 transition-all duration-200 hover:border-border hover:bg-card/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
-        >
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-secondary text-foreground group-hover:scale-105 transition-transform">
-            <Sparkles className="h-4 w-4 text-amber-400" />
-          </div>
-          <div className="mt-4">
-            <h3 className="text-sm sm:text-base font-semibold text-foreground group-hover:text-amber-400 transition-colors">
-              Trade Analysis
-            </h3>
-            <p className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
-              AI insights & validation
-            </p>
-          </div>
-        </Link>
+      {/* 3. VALIDATION PERFORMANCE — STRICTLY ABOVE RECENT TRADES */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Validation Performance
+          </h2>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+          {stats.map((s) => (
+            <Card key={s.label} className="bg-card/60 border-border/70 p-3">
+              <div className="flex items-center justify-between text-muted-foreground pb-1">
+                <span className="text-[11px] font-medium">{s.label}</span>
+                <s.icon className="h-3.5 w-3.5 text-amber-400/80" />
+              </div>
+              <div className="text-lg font-bold text-foreground font-mono">{s.value}</div>
+            </Card>
+          ))}
+        </div>
       </div>
 
-      {/* 4. RECENT TRADES */}
+      {/* 4. VALIDATOR ACTION DOCK — 4 COMPACT REUSABLE APPLICATION ACTIONS */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            Validator Action Dock
+          </span>
+        </div>
+
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+          {/* NEW TRADE */}
+          <Link
+            to="/trade-creator"
+            className="group relative flex items-center gap-3 rounded-xl border border-amber-500/40 bg-card/90 p-3 sm:p-3.5 transition-all duration-200 hover:border-amber-400 hover:bg-card hover:shadow-[0_4px_20px_rgba(245,158,11,0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/15 text-amber-400 group-hover:scale-105 transition-transform">
+              <Plus className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 overflow-hidden text-left">
+              <div className="text-xs sm:text-sm font-semibold text-foreground truncate group-hover:text-amber-400 transition-colors">
+                New Trade
+              </div>
+              <div className="text-[10px] text-muted-foreground truncate hidden xs:block">
+                Plan & execute trade
+              </div>
+            </div>
+          </Link>
+
+          {/* JOURNAL */}
+          <Link
+            to="/journal"
+            className="group relative flex items-center gap-3 rounded-xl border border-border/70 bg-card/60 p-3 sm:p-3.5 transition-all duration-200 hover:border-border hover:bg-card hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-amber-400 group-hover:scale-105 transition-transform">
+              <BookOpen className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 overflow-hidden text-left">
+              <div className="text-xs sm:text-sm font-semibold text-foreground truncate group-hover:text-amber-400 transition-colors">
+                Journal
+              </div>
+              <div className="text-[10px] text-muted-foreground truncate hidden xs:block">
+                Personal notebook
+              </div>
+            </div>
+          </Link>
+
+          {/* STRATEGY PROFILES */}
+          <Link
+            to="/strategy-profiles"
+            className="group relative flex items-center gap-3 rounded-xl border border-border/70 bg-card/60 p-3 sm:p-3.5 transition-all duration-200 hover:border-border hover:bg-card hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-amber-400 group-hover:scale-105 transition-transform">
+              <Sliders className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 overflow-hidden text-left">
+              <div className="text-xs sm:text-sm font-semibold text-foreground truncate group-hover:text-amber-400 transition-colors">
+                Strategy
+              </div>
+              <div className="text-[10px] text-muted-foreground truncate hidden xs:block">
+                Manage setups & edge
+              </div>
+            </div>
+          </Link>
+
+          {/* TRADE ANALYSIS */}
+          <Link
+            to="/trade-analysis"
+            className="group relative flex items-center gap-3 rounded-xl border border-border/70 bg-card/60 p-3 sm:p-3.5 transition-all duration-200 hover:border-border hover:bg-card hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-amber-400 group-hover:scale-105 transition-transform">
+              <Sparkles className="h-4 w-4" />
+            </div>
+            <div className="min-w-0 overflow-hidden text-left">
+              <div className="text-xs sm:text-sm font-semibold text-foreground truncate group-hover:text-amber-400 transition-colors">
+                Trade Analysis
+              </div>
+              <div className="text-[10px] text-muted-foreground truncate hidden xs:block">
+                AI insights & records
+              </div>
+            </div>
+          </Link>
+        </div>
+      </div>
+
+      {/* 5. RECENT TRADES */}
       <div className="space-y-3 pt-2">
         <div className="flex items-center justify-between">
           <h2 className="text-sm sm:text-base font-bold tracking-tight text-foreground">
             Recent Trades
           </h2>
           <Link
-            to="/journal"
+            to="/trade-analysis"
             className="text-xs text-amber-400 hover:text-amber-300 font-medium flex items-center gap-0.5"
           >
             View all
@@ -314,39 +342,31 @@ function MetaValidatorPlatform() {
         )}
       </div>
 
-      {/* 5. SUMMARY METRICS STRIP */}
-      <div className="space-y-3 pt-4 border-t border-border/60">
-        <h2 className="text-sm font-bold tracking-tight text-foreground">
-          Validation Performance
-        </h2>
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
-          {stats.map((s) => (
-            <Card key={s.label} className="bg-card/40 border-border/70 p-3">
-              <div className="flex items-center justify-between text-muted-foreground pb-1">
-                <span className="text-[11px] font-medium">{s.label}</span>
-                <s.icon className="h-3.5 w-3.5" />
-              </div>
-              <div className="text-lg font-bold text-foreground font-mono">{s.value}</div>
-            </Card>
-          ))}
-        </div>
-      </div>
-
-      {/* 6. LEARNING INSIGHTS */}
+      {/* 6. LEARNING INSIGHTS & RULE DISCIPLINE */}
       {insightsQ.data && insightsQ.data.length > 0 && (
         <Card className="bg-card/50 border-border/70">
           <CardHeader className="py-3 px-4">
-            <CardTitle className="text-sm font-semibold flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-amber-400" />
-              Learning Insights & Rule Discipline
+            <CardTitle className="text-sm font-semibold flex items-center justify-between">
+              <span className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-amber-400" />
+                Learning Insights & Rule Discipline
+              </span>
+              <Link
+                to="/trade-analysis"
+                className="text-xs text-amber-400 hover:text-amber-300 font-normal"
+              >
+                View all insights
+              </Link>
             </CardTitle>
           </CardHeader>
           <CardContent className="px-4 pb-4">
             <div className="grid gap-2 sm:grid-cols-2">
               {insightsQ.data.map((i) => (
-                <div
+                <Link
                   key={i.id}
-                  className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 text-xs flex items-center justify-between gap-2"
+                  to="/trade-analysis"
+                  search={{ insight: i.content, category: i.category as any }}
+                  className="rounded-lg border border-border/60 bg-secondary/30 p-2.5 text-xs flex items-center justify-between gap-2 hover:border-border hover:bg-secondary/50 transition-colors"
                 >
                   <span className="text-foreground font-medium truncate">{i.content}</span>
                   <Badge
@@ -355,7 +375,7 @@ function MetaValidatorPlatform() {
                   >
                     {i.category} · {i.occurrences}×
                   </Badge>
-                </div>
+                </Link>
               ))}
             </div>
           </CardContent>
