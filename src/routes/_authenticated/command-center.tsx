@@ -19,6 +19,8 @@ import {
   fetchPlatformConfig,
   runSystemReconciliation,
   fetchAuditLogs,
+  onboardInvestorAccount,
+  fetchEligibleUsersForOnboarding,
   type CompanySummary,
   type ReconciliationCheck,
 } from "@/lib/metafund-api";
@@ -52,6 +54,7 @@ import {
   Sliders,
   Lock,
   ArrowLeft,
+  UserPlus,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -81,6 +84,11 @@ function CompanyCommandCenter() {
   const qc = useQueryClient();
 
   // State for Modals
+  const [isOnboardOpen, setIsOnboardOpen] = useState(false);
+  const [onboardUserId, setOnboardUserId] = useState("");
+  const [onboardCurrency, setOnboardCurrency] = useState("USD");
+  const [onboardAccountNum, setOnboardAccountNum] = useState("");
+
   const [isDepositOpen, setIsDepositOpen] = useState(false);
   const [selectedInvestorId, setSelectedInvestorId] = useState("");
   const [depositAmount, setDepositAmount] = useState("");
@@ -104,6 +112,36 @@ function CompanyCommandCenter() {
   const investorsQ = useQuery({
     queryKey: ["admin", "investors"],
     queryFn: fetchAllInvestors,
+  });
+
+  // 2b. Eligible Users for Onboarding
+  const eligibleUsersQ = useQuery({
+    queryKey: ["admin", "eligible_users"],
+    queryFn: fetchEligibleUsersForOnboarding,
+  });
+
+  // Onboard Investor Mutation
+  const onboardInvestorMut = useMutation({
+    mutationFn: async () => {
+      if (!onboardUserId) throw new Error("Please select a user to onboard.");
+      return onboardInvestorAccount({
+        userId: onboardUserId,
+        accountNumber: onboardAccountNum || undefined,
+        currency: onboardCurrency,
+        status: "ACTIVE",
+      });
+    },
+    onSuccess: (acc) => {
+      toast.success(`Investor account ${acc.account_number} created successfully.`);
+      setIsOnboardOpen(false);
+      setOnboardUserId("");
+      setOnboardAccountNum("");
+      qc.invalidateQueries({ queryKey: ["admin", "investors"] });
+      qc.invalidateQueries({ queryKey: ["admin", "company_summary"] });
+    },
+    onError: (err: any) => {
+      toast.error(err?.message || "Failed to onboard investor account.");
+    },
   });
 
   // 3. Capital Events
@@ -411,9 +449,81 @@ function CompanyCommandCenter() {
         {/* INVESTORS TAB */}
         <TabsContent value="investors" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Investor Accounts</CardTitle>
-              <CardDescription>Governed investor profiles and current active status.</CardDescription>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Investor Accounts</CardTitle>
+                <CardDescription>Governed investor profiles and current active status.</CardDescription>
+              </div>
+
+              <Dialog open={isOnboardOpen} onOpenChange={setIsOnboardOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gold-gradient-btn text-xs">
+                    <UserPlus className="h-3.5 w-3.5 mr-1.5" /> Onboard Investor
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md bg-card border-border">
+                  <DialogHeader>
+                    <DialogTitle className="text-foreground">Onboard New Investor</DialogTitle>
+                    <DialogDescription>
+                      Create a governed investor account identity for an authenticated user.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4 py-3">
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground">Select User</Label>
+                      <select
+                        className="w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm text-foreground focus-visible:ring-1 focus-visible:ring-amber-400"
+                        value={onboardUserId}
+                        onChange={(e) => setOnboardUserId(e.target.value)}
+                      >
+                        <option value="">-- Choose User Identity --</option>
+                        {eligibleUsersQ.data?.map((u: any) => (
+                          <option key={u.user_id} value={u.user_id}>
+                            {u.email || u.user_id} ({u.subscription_tier || "PRO"})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Base Currency</Label>
+                        <select
+                          className="w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm text-foreground focus-visible:ring-1 focus-visible:ring-amber-400"
+                          value={onboardCurrency}
+                          onChange={(e) => setOnboardCurrency(e.target.value)}
+                        >
+                          <option value="USD">USD ($)</option>
+                          <option value="EUR">EUR (€)</option>
+                          <option value="GBP">GBP (£)</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Account # (Optional)</Label>
+                        <Input
+                          placeholder="Auto-generated if blank"
+                          value={onboardAccountNum}
+                          onChange={(e) => setOnboardAccountNum(e.target.value)}
+                          className="bg-secondary/50 border-border text-xs"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setIsOnboardOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      className="gold-gradient-btn"
+                      disabled={onboardInvestorMut.isPending || !onboardUserId}
+                      onClick={() => onboardInvestorMut.mutate()}
+                    >
+                      {onboardInvestorMut.isPending ? "Creating..." : "Onboard Account"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             </CardHeader>
             <CardContent>
               <div className="overflow-x-auto">
@@ -580,268 +690,4 @@ function CompanyCommandCenter() {
                           </Badge>
                         </td>
                         <td className="py-2 px-3">
-                          {c.status === "UPCOMING" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={async () => {
-                                await activateInvestmentCycle(c.id);
-                                toast.success(`Cycle ${c.cycle_name} activated.`);
-                                qc.invalidateQueries({ queryKey: ["admin", "cycles"] });
-                              }}
-                            >
-                              Activate
-                            </Button>
-                          )}
-                          {c.status === "ACTIVE" && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={async () => {
-                                await closeInvestmentCycle(c.id);
-                                toast.success(`Cycle ${c.cycle_name} closed.`);
-                                qc.invalidateQueries({ queryKey: ["admin", "cycles"] });
-                              }}
-                            >
-                              Close
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* WITHDRAWALS TAB */}
-        <TabsContent value="withdrawals" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Withdrawal Request Management</CardTitle>
-              <CardDescription>Controlled review, approval, and settlement workflows.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-muted-foreground">
-                      <th className="py-2 px-3">Requested At</th>
-                      <th className="py-2 px-3">Account</th>
-                      <th className="py-2 px-3">Amount ($ USD)</th>
-                      <th className="py-2 px-3">Status</th>
-                      <th className="py-2 px-3">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {withdrawalsQ.data?.map((w: any) => (
-                      <tr key={w.id} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="py-2 px-3 text-muted-foreground">{new Date(w.created_at).toLocaleDateString()}</td>
-                        <td className="py-2 px-3 font-mono">{w.investor_accounts?.account_number || "—"}</td>
-                        <td className="py-2 px-3 font-mono font-bold">${Number(w.requested_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}</td>
-                        <td className="py-2 px-3">
-                          <Badge
-                            variant={
-                              w.status === "PROCESSED"
-                                ? "default"
-                                : w.status === "APPROVED"
-                                ? "outline"
-                                : w.status === "REJECTED" || w.status === "CANCELLED"
-                                ? "destructive"
-                                : "secondary"
-                            }
-                          >
-                            {w.status}
-                          </Badge>
-                        </td>
-                        <td className="py-2 px-3 flex gap-2">
-                          {w.status === "REQUESTED" && (
-                            <>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={async () => {
-                                  try {
-                                    await approveWithdrawal(w.id);
-                                    toast.success("Withdrawal approved.");
-                                    qc.invalidateQueries({ queryKey: ["admin"] });
-                                  } catch (e: any) {
-                                    toast.error(e?.message || "Failed to approve.");
-                                  }
-                                }}
-                              >
-                                Approve
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="destructive"
-                                onClick={async () => {
-                                  try {
-                                    await rejectWithdrawal(w.id, "Admin rejection");
-                                    toast.success("Withdrawal rejected.");
-                                    qc.invalidateQueries({ queryKey: ["admin"] });
-                                  } catch (e: any) {
-                                    toast.error(e?.message || "Failed to reject.");
-                                  }
-                                }}
-                              >
-                                Reject
-                              </Button>
-                            </>
-                          )}
-                          {w.status === "APPROVED" && (
-                            <Button
-                              size="sm"
-                              onClick={async () => {
-                                try {
-                                  await settleWithdrawal(w.id, "BANK_TRANSFER_COMPLETED");
-                                  toast.success("Withdrawal settled and ledger payout posted.");
-                                  qc.invalidateQueries({ queryKey: ["admin"] });
-                                } catch (e: any) {
-                                  toast.error(e?.message || "Failed to settle.");
-                                }
-                              }}
-                            >
-                              Settle Payout
-                            </Button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* FINANCIAL LEDGER TAB */}
-        <TabsContent value="ledger" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Immutable Financial Ledger</CardTitle>
-              <CardDescription>Append-only audit trail protected by database engine mutation triggers.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-muted-foreground">
-                      <th className="py-2 px-3">Timestamp</th>
-                      <th className="py-2 px-3">Account</th>
-                      <th className="py-2 px-3">Event Type</th>
-                      <th className="py-2 px-3">Base Amount ($ USD)</th>
-                      <th className="py-2 px-3">Description</th>
-                      <th className="py-2 px-3">Idempotency Key</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ledgerQ.data?.map((l: any) => (
-                      <tr key={l.id} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="py-2 px-3 text-muted-foreground text-xs">{new Date(l.created_at).toLocaleString()}</td>
-                        <td className="py-2 px-3 font-mono">{l.investor_accounts?.account_number || "—"}</td>
-                        <td className="py-2 px-3">
-                          <Badge variant="outline">{l.event_type}</Badge>
-                        </td>
-                        <td className={`py-2 px-3 font-mono font-bold ${Number(l.amount) >= 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                          {Number(l.amount) >= 0 ? "+" : ""}${Number(l.amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
-                        </td>
-                        <td className="py-2 px-3 text-xs max-w-sm truncate">{l.description}</td>
-                        <td className="py-2 px-3 font-mono text-xs text-muted-foreground truncate max-w-xs">{l.idempotency_key}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* RECONCILIATION TAB */}
-        <TabsContent value="reconciliation" className="space-y-4">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-base">16-Point Financial Invariant Reconciliation</CardTitle>
-                <CardDescription>Mathematical and structural invariant validator running on live engine.</CardDescription>
-              </div>
-              <Button size="sm" variant="outline" onClick={() => reconQ.refetch()}>
-                <RefreshCw className="h-4 w-4 mr-2" /> Run Invariants
-              </Button>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-muted-foreground">
-                      <th className="py-2 px-3">Check Code</th>
-                      <th className="py-2 px-3">Invariant Name</th>
-                      <th className="py-2 px-3">Severity</th>
-                      <th className="py-2 px-3">Discrepancies</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reconQ.data?.map((rc: ReconciliationCheck, idx: number) => (
-                      <tr key={idx} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="py-2 px-3 font-mono font-semibold">{rc.check_code}</td>
-                        <td className="py-2 px-3">{rc.check_name}</td>
-                        <td className="py-2 px-3">
-                          <Badge variant={rc.severity === "OK" ? "default" : "destructive"}>
-                            {rc.severity}
-                          </Badge>
-                        </td>
-                        <td className={`py-2 px-3 font-mono font-bold ${rc.discrepancy_count === 0 ? "text-emerald-500" : "text-rose-500"}`}>
-                          {rc.discrepancy_count}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* AUDIT LOG TAB */}
-        <TabsContent value="audit" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Operational Audit Trail</CardTitle>
-              <CardDescription>Immutable activity trail of all administrative and financial actions.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm">
-                  <thead>
-                    <tr className="border-b border-border text-muted-foreground">
-                      <th className="py-2 px-3">Timestamp</th>
-                      <th className="py-2 px-3">Table</th>
-                      <th className="py-2 px-3">Action</th>
-                      <th className="py-2 px-3">Performed By</th>
-                      <th className="py-2 px-3">Payload</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {auditLogsQ.data?.map((al: any) => (
-                      <tr key={al.id} className="border-b border-border/50 hover:bg-muted/30">
-                        <td className="py-2 px-3 text-muted-foreground text-xs">{new Date(al.created_at).toLocaleString()}</td>
-                        <td className="py-2 px-3 font-mono text-xs">{al.table_name}</td>
-                        <td className="py-2 px-3"><Badge variant="outline">{al.action}</Badge></td>
-                        <td className="py-2 px-3 font-mono text-xs">{al.performed_by || "SYSTEM"}</td>
-                        <td className="py-2 px-3 font-mono text-xs max-w-md truncate text-muted-foreground">
-                          {JSON.stringify(al.payload)}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
-    </div>
-  );
-}
+                          {c.status === "UPCOMING" && (\n                            <Button\n                              size=\"sm\"\n                              variant=\"outline\"\n                              onClick={async () => {\n                                await activateInvestmentCycle(c.id);\n                                toast.success(`Cycle ${c.cycle_name} activated.`);\n                                qc.invalidateQueries({ queryKey: [\"admin\", \"cycles\"] });\n                              }}\n                            >\n                              Activate\n                            </Button>\n                          )}\n                          {c.status === \"ACTIVE\" && (\n                            <Button\n                              size=\"sm\"\n                              variant=\"outline\"\n                              onClick={async () => {\n                                await closeInvestmentCycle(c.id);\n                                toast.success(`Cycle ${c.cycle_name} closed.`);\n                                qc.invalidateQueries({ queryKey: [\"admin\", \"cycles\"] });\n                              }}\n                            >\n                              Close\n                            </Button>\n                          )}\n                        </td>\n                      </tr>\n                    ))}\n                  </tbody>\n                </table>\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>\n\n        {/* WITHDRAWALS TAB */}\n        <TabsContent value=\"withdrawals\" className=\"space-y-4\">\n          <Card>\n            <CardHeader>\n              <CardTitle className=\"text-base\">Withdrawal Request Management</CardTitle>\n              <CardDescription>Controlled review, approval, and settlement workflows.</CardDescription>\n            </CardHeader>\n            <CardContent>\n              <div className=\"overflow-x-auto\">\n                <table className=\"w-full text-left text-sm\">\n                  <thead>\n                    <tr className=\"border-b border-border text-muted-foreground\">\n                      <th className=\"py-2 px-3\">Requested At</th>\n                      <th className=\"py-2 px-3\">Account</th>\n                      <th className=\"py-2 px-3\">Amount ($ USD)</th>\n                      <th className=\"py-2 px-3\">Status</th>\n                      <th className=\"py-2 px-3\">Actions</th>\n                    </tr>\n                  </thead>\n                  <tbody>\n                    {withdrawalsQ.data?.map((w: any) => (\n                      <tr key={w.id} className=\"border-b border-border/50 hover:bg-muted/30\">\n                        <td className=\"py-2 px-3 text-muted-foreground\">{new Date(w.created_at).toLocaleDateString()}</td>\n                        <td className=\"py-2 px-3 font-mono\">{w.investor_accounts?.account_number || \"—\"}</td>\n                        <td className=\"py-2 px-3 font-mono font-bold\">${Number(w.requested_amount).toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}</td>\n                        <td className=\"py-2 px-3\">\n                          <Badge\n                            variant={\n                              w.status === \"PROCESSED\"\n                                ? \"default\"\n                                : w.status === \"APPROVED\"\n                                ? \"outline\"\n                                : w.status === \"REJECTED\" || w.status === \"CANCELLED\"\n                                ? \"destructive\"\n                                : \"secondary\"\n                            }\n                          >\n                            {w.status}\n                          </Badge>\n                        </td>\n                        <td className=\"py-2 px-3 flex gap-2\">\n                          {w.status === \"REQUESTED\" && (\n                            <>\n                              <Button\n                                size=\"sm\"\n                                variant=\"outline\"\n                                onClick={async () => {\n                                  try {\n                                    await approveWithdrawal(w.id);\n                                    toast.success(\"Withdrawal approved.\");\n                                    qc.invalidateQueries({ queryKey: [\"admin\"] });\n                                  } catch (e: any) {\n                                    toast.error(e?.message || \"Failed to approve.\");\n                                  }\n                                }}\n                              >\n                                Approve\n                              </Button>\n                              <Button\n                                size=\"sm\"\n                                variant=\"destructive\"\n                                onClick={async () => {\n                                  try {\n                                    await rejectWithdrawal(w.id, \"Admin rejection\");\n                                    toast.success(\"Withdrawal rejected.\");\n                                    qc.invalidateQueries({ queryKey: [\"admin\"] });\n                                  } catch (e: any) {\n                                    toast.error(e?.message || \"Failed to reject.\");\n                                  }\n                                }}\n                              >\n                                Reject\n                              </Button>\n                            </>\n                          )}\n                          {w.status === \"APPROVED\" && (\n                            <Button\n                              size=\"sm\"\n                              onClick={async () => {\n                                try {\n                                  await settleWithdrawal(w.id, \"BANK_TRANSFER_COMPLETED\");\n                                  toast.success(\"Withdrawal settled and ledger payout posted.\");\n                                  qc.invalidateQueries({ queryKey: [\"admin\"] });\n                                } catch (e: any) {\n                                  toast.error(e?.message || \"Failed to settle.\");\n                                }\n                              }}\n                            >\n                              Settle Payout\n                            </Button>\n                          )}\n                        </td>\n                      </tr>\n                    ))}\n                  </tbody>\n                </table>\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>\n\n        {/* FINANCIAL LEDGER TAB */}\n        <TabsContent value=\"ledger\" className=\"space-y-4\">\n          <Card>\n            <CardHeader>\n              <CardTitle className=\"text-base\">Immutable Financial Ledger</CardTitle>\n              <CardDescription>Append-only audit trail protected by database engine mutation triggers.</CardDescription>\n            </CardHeader>\n            <CardContent>\n              <div className=\"overflow-x-auto\">\n                <table className=\"w-full text-left text-sm\">\n                  <thead>\n                    <tr className=\"border-b border-border text-muted-foreground\">\n                      <th className=\"py-2 px-3\">Timestamp</th>\n                      <th className=\"py-2 px-3\">Account</th>\n                      <th className=\"py-2 px-3\">Event Type</th>\n                      <th className=\"py-2 px-3\">Base Amount ($ USD)</th>\n                      <th className=\"py-2 px-3\">Description</th>\n                      <th className=\"py-2 px-3\">Idempotency Key</th>\n                    </tr>\n                  </thead>\n                  <tbody>\n                    {ledgerQ.data?.map((l: any) => (\n                      <tr key={l.id} className=\"border-b border-border/50 hover:bg-muted/30\">\n                        <td className=\"py-2 px-3 text-muted-foreground text-xs\">{new Date(l.created_at).toLocaleString()}</td>\n                        <td className=\"py-2 px-3 font-mono\">{l.investor_accounts?.account_number || \"—\"}</td>\n                        <td className=\"py-2 px-3\">\n                          <Badge variant=\"outline\">{l.event_type}</Badge>\n                        </td>\n                        <td className={`py-2 px-3 font-mono font-bold ${Number(l.amount) >= 0 ? \"text-emerald-500\" : \"text-rose-500\"}`}>\n                          {Number(l.amount) >= 0 ? \"+\" : \"\"}${Number(l.amount).toLocaleString(\"en-US\", { minimumFractionDigits: 2 })}\n                        </td>\n                        <td className=\"py-2 px-3 text-xs max-w-sm truncate\">{l.description}</td>\n                        <td className=\"py-2 px-3 font-mono text-xs text-muted-foreground truncate max-w-xs\">{l.idempotency_key}</td>\n                      </tr>\n                    ))}\n                  </tbody>\n                </table>\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>\n\n        {/* RECONCILIATION TAB */}\n        <TabsContent value=\"reconciliation\" className=\"space-y-4\">\n          <Card>\n            <CardHeader className=\"flex flex-row items-center justify-between\">\n              <div>\n                <CardTitle className=\"text-base\">16-Point Financial Invariant Reconciliation</CardTitle>\n                <CardDescription>Mathematical and structural invariant validator running on live engine.</CardDescription>\n              </div>\n              <Button size=\"sm\" variant=\"outline\" onClick={() => reconQ.refetch()}>\n                <RefreshCw className=\"h-4 w-4 mr-2\" /> Run Invariants\n              </Button>\n            </CardHeader>\n            <CardContent>\n              <div className=\"overflow-x-auto\">\n                <table className=\"w-full text-left text-sm\">\n                  <thead>\n                    <tr className=\"border-b border-border text-muted-foreground\">\n                      <th className=\"py-2 px-3\">Check Code</th>\n                      <th className=\"py-2 px-3\">Invariant Name</th>\n                      <th className=\"py-2 px-3\">Severity</th>\n                      <th className=\"py-2 px-3\">Discrepancies</th>\n                    </tr>\n                  </thead>\n                  <tbody>\n                    {reconQ.data?.map((rc: ReconciliationCheck, idx: number) => (\n                      <tr key={idx} className=\"border-b border-border/50 hover:bg-muted/30\">\n                        <td className=\"py-2 px-3 font-mono font-semibold\">{rc.check_code}</td>\n                        <td className=\"py-2 px-3\">{rc.check_name}</td>\n                        <td className=\"py-2 px-3\">\n                          <Badge variant={rc.severity === \"OK\" ? \"default\" : \"destructive\"}>\n                            {rc.severity}\n                          </Badge>\n                        </td>\n                        <td className={`py-2 px-3 font-mono font-bold ${rc.discrepancy_count === 0 ? \"text-emerald-500\" : \"text-rose-500\"}`}>\n                          {rc.discrepancy_count}\n                        </td>\n                      </tr>\n                    ))}\n                  </tbody>\n                </table>\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>\n\n        {/* AUDIT LOG TAB */}\n        <TabsContent value=\"audit\" className=\"space-y-4\">\n          <Card>\n            <CardHeader>\n              <CardTitle className=\"text-base\">Operational Audit Trail</CardTitle>\n              <CardDescription>Immutable activity trail of all administrative and financial actions.</CardDescription>\n            </CardHeader>\n            <CardContent>\n              <div className=\"overflow-x-auto\">\n                <table className=\"w-full text-left text-sm\">\n                  <thead>\n                    <tr className=\"border-b border-border text-muted-foreground\">\n                      <th className=\"py-2 px-3\">Timestamp</th>\n                      <th className=\"py-2 px-3\">Table</th>\n                      <th className=\"py-2 px-3\">Action</th>\n                      <th className=\"py-2 px-3\">Performed By</th>\n                      <th className=\"py-2 px-3\">Payload</th>\n                    </tr>\n                  </thead>\n                  <tbody>\n                    {auditLogsQ.data?.map((al: any) => (\n                      <tr key={al.id} className=\"border-b border-border/50 hover:bg-muted/30\">\n                        <td className=\"py-2 px-3 text-muted-foreground text-xs\">{new Date(al.created_at).toLocaleString()}</td>\n                        <td className=\"py-2 px-3 font-mono text-xs\">{al.table_name}</td>\n                        <td className=\"py-2 px-3\"><Badge variant=\"outline\">{al.action}</Badge></td>\n                        <td className=\"py-2 px-3 font-mono text-xs\">{al.performed_by || \"SYSTEM\"}</td>\n                        <td className=\"py-2 px-3 font-mono text-xs max-w-md truncate text-muted-foreground\">\n                          {JSON.stringify(al.payload)}\n                        </td>\n                      </tr>\n                    ))}\n                  </tbody>\n                </table>\n              </div>\n            </CardContent>\n          </Card>\n        </TabsContent>\n      </Tabs>\n    </div>\n  );\n}\n
