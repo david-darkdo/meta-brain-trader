@@ -322,3 +322,38 @@ export async function triggerTradeResultAllocation(tradeId: string) {
   if (error) throw error;
   return data;
 }
+
+export async function onboardInvestorAccount(params: {
+  userId: string;
+  accountNumber?: string;
+  currency?: string;
+  status?: InvestorAccountStatus;
+}) {
+  const accNum =
+    params.accountNumber?.trim() ||
+    `MF-${Date.now().toString(36).toUpperCase()}-${Math.floor(1000 + Math.random() * 9000)}`;
+
+  const { data, error } = await supabase
+    .from("investor_accounts")
+    .insert({
+      user_id: params.userId,
+      account_number: accNum,
+      currency: params.currency || "USD",
+      status: params.status || "ACTIVE",
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchEligibleUsersForOnboarding() {
+  const { data, error } = await supabase
+    .from("users")
+    .select("user_id, email, subscription_tier")
+    .order("created_at", { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
