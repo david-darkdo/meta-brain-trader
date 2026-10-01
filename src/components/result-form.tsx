@@ -42,38 +42,29 @@ export function ResultForm({ tradeId }: { tradeId: string }) {
 
   const save = useMutation({
     mutationFn: async () => {
-      const payload = {
-        trade_id: tradeId,
-        outcome,
-        closing_price: closingPrice ? Number(closingPrice) : null,
-        pnl_amount: pnlAmount ? Number(pnlAmount) : null,
-        pnl_percent: pnlPercent ? Number(pnlPercent) : null,
-        rr_achieved: rrAchieved ? Number(rrAchieved) : null,
-        result_notes: notes || null,
-        close_date: new Date().toISOString(),
-      };
-      if (resultQ.data?.id) {
-        const { error } = await supabase.from("results").update(payload).eq("id", resultQ.data.id);
-        if (error) throw error;
-      } else {
-        const { error } = await supabase.from("results").insert(payload);
-        if (error) throw error;
+      const pnl = pnlPercent === "" ? null : Number(pnlPercent);
+      if (pnl === null || !Number.isFinite(pnl)) {
+        throw new Error("Enter a valid P&L percentage before posting the trade result.");
       }
 
-      // If pnl_percent is present, invoke idempotent MetaFund allocation
-      if (pnlPercent !== "" && !isNaN(Number(pnlPercent))) {
-        try {
-          await supabase.rpc("process_trade_result_allocation", { p_trade_id: tradeId });
-        } catch (allocErr) {
-          console.warn("MetaFund allocation notice:", allocErr);
-        }
-      }
+      const { data, error } = await supabase.rpc("save_trade_result_and_allocate", {
+        p_trade_id: tradeId,
+        p_outcome: outcome,
+        p_closing_price: closingPrice ? Number(closingPrice) : null,
+        p_pnl_amount: pnlAmount ? Number(pnlAmount) : null,
+        p_pnl_percent: pnl,
+        p_rr_achieved: rrAchieved ? Number(rrAchieved) : null,
+        p_result_notes: notes || null,
+      });
+      if (error) throw error;
+      return data;
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["trade", tradeId, "result"] });
+      qc.invalidateQueries({ queryKey: ["trade", tradeId] });
       qc.invalidateQueries({ queryKey: ["investor"] });
       qc.invalidateQueries({ queryKey: ["admin"] });
-      toast.success("Result saved and financial allocations processed");
+      toast.success("Result saved and MetaFund allocation posted");
     },
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
