@@ -1002,6 +1002,7 @@ function CommandCenterDashboard() {
                   <th className="p-3">Account</th>
                   <th className="p-3">Event Type</th>
                   <th className="p-3">Amount</th>
+                  <th className="p-3">Payout Destination</th>
                   <th className="p-3">Status</th>
                   <th className="p-3">Timestamp</th>
                 </tr>
@@ -1112,7 +1113,23 @@ function CommandCenterDashboard() {
                   <tr key={w.id} className="hover:bg-secondary/20">
                     <td className="p-3 font-bold text-foreground">{w.investor_accounts?.account_number || w.investor_id}</td>
                     <td className="p-3 font-bold text-foreground">
-                      ${Number(w.requested_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                      ${Number(w.requested_amount).toLocaleString("en-US", { minimumFractionDigits: 2 })} {w.currency || "USD"}
+                    </td>
+                    <td className="p-3 text-[11px] text-muted-foreground font-sans max-w-xs">
+                      {w.payout_details?.method === "BANK" ? (
+                        <div>
+                          <div className="font-semibold text-foreground">{w.payout_details.account_name || "Bank account"}</div>
+                          <div>{w.payout_details.bank_name || "Bank"} · {w.payout_details.account_number || "No account"}</div>
+                          <div>{w.payout_details.currency || w.currency || "USD"}</div>
+                        </div>
+                      ) : w.payout_details?.method === "CRYPTO" ? (
+                        <div>
+                          <div className="font-semibold text-foreground">{w.payout_details.asset || "Crypto"} · {w.payout_details.network || "Network"}</div>
+                          <div className="font-mono break-all">{w.payout_details.wallet_address || "No wallet address"}</div>
+                        </div>
+                      ) : (
+                        <span>Destination details not supplied</span>
+                      )}
                     </td>
                     <td className="p-3">
                       <Badge
