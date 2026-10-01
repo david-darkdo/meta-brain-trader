@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   fetchInvestorSummary,
@@ -85,6 +85,20 @@ function InvestorMetaFundDashboard() {
   const paymentAccountsForCurrency = paymentAccounts.filter((a) => a.currency === depositCurrency);
   const selectedPaymentAccount = paymentAccounts.find((a) => a.id === selectedPaymentAccountId) ?? paymentAccountsForCurrency[0] ?? null;
 
+  useEffect(() => {
+    if (paymentAccounts.length === 0) return;
+    const matching = paymentAccounts.filter((a) => a.currency === depositCurrency);
+    if (matching.length === 0) {
+      const first = paymentAccounts[0];
+      setDepositCurrency(first.currency);
+      setSelectedPaymentAccountId(first.id);
+      return;
+    }
+    if (!matching.some((a) => a.id === selectedPaymentAccountId)) {
+      setSelectedPaymentAccountId(matching[0].id);
+    }
+  }, [paymentAccounts, depositCurrency, selectedPaymentAccountId]);
+
   // 2. Fetch Investor Trade Participation History
   const tradeHistoryQ = useQuery({
     queryKey: ["investor", "trade_history"],
@@ -113,9 +127,6 @@ function InvestorMetaFundDashboard() {
       const amt = Number(depositAmount);
       if (!Number.isFinite(amt) || amt <= 0) throw new Error("Enter a valid positive deposit amount.");
       if (!selectedPaymentAccount) throw new Error("Select the company account you paid into.");
-      if (!depositProof) throw new Error("Proof of payment is required.");
-      if (depositProof.size > 10 * 1024 * 1024) throw new Error("Proof file must be 10 MB or smaller.");
-      if (!["image/jpeg","image/png","image/webp","application/pdf"].includes(depositProof.type)) throw new Error("Proof must be JPG, PNG, WEBP, or PDF.");
       return createInvestorDepositIntent({ accountId: investorId, amount: amt, currency: depositCurrency, paymentAccountId: selectedPaymentAccount.id });
     },
     onSuccess: (result) => { setDepositIntentId(result.event_id); setDepositStep("proof"); setDepositError(null); },
@@ -370,14 +381,14 @@ function InvestorMetaFundDashboard() {
                       </div>
                     )}
                     <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label htmlFor="deposit-amount" className="text-xs">Amount Deposited</Label><Input id="deposit-amount" type="number" min="0.01" step="any" value={depositAmount} onChange={e=>setDepositAmount(e.target.value)} /></div><div className="space-y-1.5"><Label htmlFor="deposit-tx" className="text-xs">Transaction ID (Optional)</Label><Input id="deposit-tx" value={depositTransactionId} onChange={e=>setDepositTransactionId(e.target.value)} placeholder="Bank / transfer reference" /></div></div>
-                    <div className="space-y-1.5"><Label htmlFor="deposit-proof" className="text-xs">Proof of Payment</Label><Input id="deposit-proof" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={e=>setDepositProof(e.target.files?.[0] || null)} /><p className="text-[10px] text-muted-foreground">Required · JPG, PNG, WEBP or PDF · maximum 10 MB</p></div>
+                    <div className="rounded-lg border border-border/60 bg-background/30 p-3 text-xs text-muted-foreground">After creating the deposit intent, complete the transfer using the account details above. Then return here with your payment screenshot or PDF and submit it for verification.</div>
                     {depositError && <p className="text-xs text-destructive">{depositError}</p>}
                   </>)}
                 </div>
               ) : (
                 <div className="space-y-4 py-3"><div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4"><div className="text-xs font-semibold text-emerald-400">Deposit intent created</div><p className="mt-1 text-xs text-muted-foreground">{"$"}{Number(depositAmount || 0).toLocaleString()} {depositCurrency} is not counted as capital yet. Submit the evidence to lock it for company verification.</p></div><div className="space-y-1.5"><Label htmlFor="deposit-proof-final" className="text-xs">Proof of Payment</Label><Input id="deposit-proof-final" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={e=>setDepositProof(e.target.files?.[0] || null)} />{depositProof && <p className="text-xs text-muted-foreground">{depositProof.name} · {(depositProof.size/1024/1024).toFixed(2)} MB</p>}</div><div className="space-y-1.5"><Label htmlFor="deposit-tx-final" className="text-xs">Transaction ID (Optional)</Label><Input id="deposit-tx-final" value={depositTransactionId} onChange={e=>setDepositTransactionId(e.target.value)} /></div>{depositError && <p className="text-xs text-destructive">{depositError}</p>}</div>
               )}
-              <DialogFooter><Button variant="outline" onClick={()=>setIsDepositModalOpen(false)}>Cancel</Button>{isAccountOnboarded && paymentAccounts.length>0 && depositStep==="details" && <Button className="gold-gradient-btn" disabled={createDepositIntentMutation.isPending || !depositAmount || !selectedPaymentAccount || !depositProof} onClick={()=>createDepositIntentMutation.mutate()}>{createDepositIntentMutation.isPending ? "Preparing..." : "Continue to Proof Submission"}</Button>}{isAccountOnboarded && depositStep==="proof" && <Button className="gold-gradient-btn" disabled={submitDepositProofMutation.isPending || !depositProof} onClick={()=>submitDepositProofMutation.mutate()}>{submitDepositProofMutation.isPending ? "Submitting..." : "Submit Proof for Verification"}</Button>}</DialogFooter>
+              <DialogFooter><Button variant="outline" onClick={()=>setIsDepositModalOpen(false)}>Cancel</Button>{isAccountOnboarded && paymentAccounts.length>0 && depositStep==="details" && <Button className="gold-gradient-btn" disabled={createDepositIntentMutation.isPending || !depositAmount || !selectedPaymentAccount} onClick={()=>createDepositIntentMutation.mutate()}>{createDepositIntentMutation.isPending ? "Creating..." : "Create Deposit Intent"}</Button>}{isAccountOnboarded && depositStep==="proof" && <Button className="gold-gradient-btn" disabled={submitDepositProofMutation.isPending || !depositProof} onClick={()=>submitDepositProofMutation.mutate()}>{submitDepositProofMutation.isPending ? "Submitting..." : "Submit Proof for Verification"}</Button>}</DialogFooter>
             </DialogContent>
           </Dialog>
 
