@@ -278,9 +278,7 @@ function InvestorMetaFundDashboard() {
                 <DialogTitle className="text-foreground">{depositStep === "details" ? "Fund Your MetaFund Account" : "Submit Deposit Proof"}</DialogTitle>
                 <DialogDescription>{depositStep === "details" ? "Choose the company payment account, make the transfer, then submit your proof. Your deposit will remain pending until the company verifies it." : "Upload the payment evidence so the company can verify and process your deposit."}</DialogDescription>
               </DialogHeader>
-              {!isAccountOnboarded ? (
-                <div className="py-5 text-center"><Info className="mx-auto h-8 w-8 text-amber-400" /><h4 className="mt-2 text-sm font-semibold">Investor Account Not Active</h4><p className="text-xs text-muted-foreground">Your MetaFund account must be opened by the company before you can deposit.</p></div>
-              ) : depositStep === "details" ? (
+              {depositStep === "details" ? (
                 <div className="space-y-4 py-2">
                   {paymentAccounts.length === 0 ? (
                     <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4"><div className="flex items-center gap-2 text-amber-400 text-sm font-semibold"><AlertCircle className="h-4 w-4" /> Company payment account not configured</div><p className="mt-1 text-xs text-muted-foreground">No verified company deposit account is published. Deposits are blocked until one is configured.</p></div>
