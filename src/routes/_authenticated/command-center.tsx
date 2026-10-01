@@ -128,6 +128,10 @@ function CommandCenterDashboard() {
   const [paymentWalletAddress, setPaymentWalletAddress] = useState("");
   const [paymentMemoTag, setPaymentMemoTag] = useState("");
   const [paymentInstructions, setPaymentInstructions] = useState("");
+  const [depositReviewId, setDepositReviewId] = useState<string | null>(null);
+  const [depositReviewFxRate, setDepositReviewFxRate] = useState("1");
+  const [depositReviewFxSource, setDepositReviewFxSource] = useState("MANUAL_ADMIN_VERIFICATION");
+  const [depositReviewNotes, setDepositReviewNotes] = useState("");
 
   // 1. Company Financial Summary
   const companySummaryQ = useQuery({
@@ -305,6 +309,56 @@ function CommandCenterDashboard() {
       qc.invalidateQueries({ queryKey: ["admin", "payment_accounts"] });
     },
     onError: (err: any) => toast.error(err?.message || "Failed to remove deposit account."),
+  });
+
+
+  const openDepositProof = async (storagePath: string) => {
+    const { data, error } = await supabase.storage.from("metafund-deposit-proofs").createSignedUrl(storagePath, 300);
+    if (error) { toast.error(error.message || "Unable to open proof."); return; }
+    if (data?.signedUrl) window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  };
+
+  const approveDepositMutation = useMutation({
+    mutationFn: async () => {
+      if (!depositReviewId) throw new Error("No deposit selected.");
+      const rate = Number(depositReviewFxRate);
+      if (!Number.isFinite(rate) || rate <= 0) throw new Error("Enter a valid USD conversion rate.");
+      const { data, error } = await supabase.rpc("admin_approve_deposit_event", {
+        p_event_id: depositReviewId,
+        p_exchange_rate_to_usd: rate,
+        p_fx_source: depositReviewFxSource,
+        p_review_notes: depositReviewNotes,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Deposit approved and capital activated.");
+      setDepositReviewId(null); setDepositReviewFxRate("1"); setDepositReviewNotes("");
+      qc.invalidateQueries({ queryKey: ["admin", "capital_events"] });
+      qc.invalidateQueries({ queryKey: ["admin", "investors"] });
+      qc.invalidateQueries({ queryKey: ["admin", "company_summary"] });
+    },
+    onError: (err: any) => toast.error(err?.message || "Failed to approve deposit."),
+  });
+
+  const rejectDepositMutation = useMutation({
+    mutationFn: async () => {
+      if (!depositReviewId) throw new Error("No deposit selected.");
+      if (!depositReviewNotes.trim()) throw new Error("Rejection reason is required.");
+      const { data, error } = await supabase.rpc("admin_reject_deposit_event", {
+        p_event_id: depositReviewId,
+        p_review_notes: depositReviewNotes.trim(),
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Deposit rejected. No capital was activated.");
+      setDepositReviewId(null); setDepositReviewNotes("");
+      qc.invalidateQueries({ queryKey: ["admin", "capital_events"] });
+    },
+    onError: (err: any) => toast.error(err?.message || "Failed to reject deposit."),
   });
 
   // 9. Audit Logs
@@ -965,6 +1019,36 @@ function CommandCenterDashboard() {
 
         {/* TAB 3: CAPITAL EVENTS */}
         <TabsContent value="capital" className="space-y-4">
+          <Card className="border-amber-500/30 bg-amber-500/5">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-sm font-bold flex items-center gap-2"><FileCheck2 className="h-4 w-4 text-amber-400" /> Deposit Verification Queue</CardTitle>
+              <CardDescription className="text-xs">Only deposits with submitted proof appear here. Approval is the only path that activates capital and posts the ledger event.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {(capitalEventsQ.data ?? []).filter((event: any) => event.status === "PENDING" && event.proof_storage_path).length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border p-5 text-center text-xs text-muted-foreground">No deposit proofs waiting for review.</div>
+              ) : (
+                (capitalEventsQ.data ?? []).filter((event: any) => event.status === "PENDING" && event.proof_storage_path).map((event: any) => (
+                  <div key={event.id} className="rounded-xl border border-border/70 bg-secondary/20 p-3">
+                    <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-mono font-semibold text-sm">{Number(event.amount ?? event.original_amount ?? 0).toLocaleString()} {event.currency}</span>
+                          <Badge variant="outline" className="text-[10px]">PROOF SUBMITTED</Badge>
+                        </div>
+                        <div className="mt-1 text-[11px] text-muted-foreground">Submitted {event.proof_submitted_at ? new Date(event.proof_submitted_at).toLocaleString() : "—"} · Transaction ID: {event.transaction_reference || "Not provided"}</div>
+                        <div className="mt-1 text-[10px] text-muted-foreground font-mono break-all">Investor: {event.investor_id}</div>
+                      </div>
+                      <div className="flex flex-wrap gap-2 shrink-0">
+                        <Button size="sm" variant="outline" className="h-8" onClick={() => openDepositProof(event.proof_storage_path)}>View Proof</Button>
+                        <Button size="sm" className="h-8 gold-gradient-btn" onClick={() => { setDepositReviewId(event.id); setDepositReviewFxRate(event.currency === "USD" ? "1" : "1"); setDepositReviewNotes(""); }}>Review</Button>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </CardContent>
+          </Card>
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-bold text-foreground">Capital Events & Deposits</h3>
             <Button size="sm" onClick={() => setIsActivateCapitalOpen(true)} className="gold-gradient-btn text-xs h-8">
@@ -1401,6 +1485,28 @@ function CommandCenterDashboard() {
           </div>
         </TabsContent>
       </Tabs>
+
+      <Dialog open={!!depositReviewId} onOpenChange={(open) => { if (!open) setDepositReviewId(null); }}>
+        <DialogContent className="sm:max-w-lg bg-card border-border">
+          <DialogHeader>
+            <DialogTitle className="text-foreground">Review Deposit Proof</DialogTitle>
+            <DialogDescription>Approval activates capital and creates the authoritative ledger event. Rejection leaves the deposit unactivated.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div><Label className="text-xs">USD Conversion Rate</Label><Input value={depositReviewFxRate} onChange={e=>setDepositReviewFxRate(e.target.value)} type="number" min="0.000001" step="any" /></div>
+              <div><Label className="text-xs">FX Source / Basis</Label><Input value={depositReviewFxSource} onChange={e=>setDepositReviewFxSource(e.target.value)} /></div>
+            </div>
+            <div><Label className="text-xs">Review Notes / Rejection Reason</Label><Input value={depositReviewNotes} onChange={e=>setDepositReviewNotes(e.target.value)} placeholder="Verification notes..." /></div>
+            <p className="text-[11px] text-muted-foreground">For USD, the system requires a 1.0 conversion rate. For other assets, enter the verified USD rate used for this approval and identify its source.</p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={()=>setDepositReviewId(null)}>Cancel</Button>
+            <Button variant="outline" className="text-destructive border-destructive/30" disabled={rejectDepositMutation.isPending || approveDepositMutation.isPending} onClick={()=>rejectDepositMutation.mutate()}>{rejectDepositMutation.isPending ? "Rejecting..." : "Reject"}</Button>
+            <Button className="gold-gradient-btn" disabled={approveDepositMutation.isPending || rejectDepositMutation.isPending} onClick={()=>approveDepositMutation.mutate()}>{approveDepositMutation.isPending ? "Approving..." : "Approve & Activate"}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
