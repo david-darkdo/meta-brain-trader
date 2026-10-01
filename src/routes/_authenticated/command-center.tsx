@@ -5,6 +5,7 @@ import { useState } from "react";
 import {
   fetchCompanyFinancialSummary,
   fetchAllInvestors,
+  fetchAdminRegisteredUsers,
   fetchAllCapitalEvents,
   fetchAllWithdrawals,
   fetchInvestmentCycles,
@@ -79,7 +80,7 @@ function CommandCenterDashboard() {
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<
-    "overview" | "investors" | "capital" | "cycles" | "withdrawals" | "ledger" | "payment_accounts" | "reconciliation" | "audit"
+    "overview" | "users" | "investors" | "capital" | "cycles" | "withdrawals" | "ledger" | "payment_accounts" | "reconciliation" | "audit"
   >("overview");
 
   // State for Capital Activation Dialog
@@ -136,7 +137,13 @@ function CommandCenterDashboard() {
     queryFn: fetchAllInvestors,
   });
 
-  // 3. Capital Events
+  // 3. Registered users
+  const usersQ = useQuery({
+    queryKey: ["admin", "registered_users"],
+    queryFn: fetchAdminRegisteredUsers,
+  });
+
+  // 4. Capital Events
   const capitalEventsQ = useQuery({
     queryKey: ["admin", "capital_events"],
     queryFn: fetchAllCapitalEvents,
@@ -773,6 +780,9 @@ function CommandCenterDashboard() {
             <TabsTrigger value="overview" className="shrink-0 whitespace-nowrap text-xs data-[state=active]:text-amber-400">
               Overview
             </TabsTrigger>
+            <TabsTrigger value="users" className="text-xs data-[state=active]:text-amber-400">
+              Users ({usersQ.data?.length ?? 0})
+            </TabsTrigger>
             <TabsTrigger value="investors" className="text-xs data-[state=active]:text-amber-400">
               Investors ({investorsQ.data?.length ?? 0})
             </TabsTrigger>
@@ -852,7 +862,38 @@ function CommandCenterDashboard() {
           </div>
         </TabsContent>
 
-        {/* TAB 2: INVESTORS */}
+        {/* TAB 2: USERS */}
+        <TabsContent value="users" className="space-y-4">
+          <div>
+            <h3 className="text-sm font-bold text-foreground">Registered Users</h3>
+            <p className="text-xs text-muted-foreground mt-1">Every user who has created an account. MetaFund investor status is shown separately and does not require manual onboarding.</p>
+          </div>
+          <div className="rounded-xl border border-border/70 overflow-hidden bg-card/60">
+            <table className="w-full text-xs text-left">
+              <thead className="bg-secondary/40 border-b border-border text-muted-foreground uppercase font-mono text-[10px]">
+                <tr>
+                  <th className="p-3">User / Email</th><th className="p-3">Plan</th><th className="p-3">Joined</th><th className="p-3">MetaFund Account</th><th className="p-3">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border/60">
+                {usersQ.data?.map((u) => (
+                  <tr key={u.user_id} className="hover:bg-secondary/20">
+                    <td className="p-3 font-sans text-foreground">{u.email || u.user_id}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{u.subscription_tier || "—"}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{new Date(u.created_at).toLocaleDateString()}</td>
+                    <td className="p-3 font-mono text-muted-foreground">{u.investor_account_number || "Not opened yet"}</td>
+                    <td className="p-3"><Badge variant={u.investor_status === "ACTIVE" ? "default" : "outline"} className="text-[10px]">{u.investor_status || "READY TO DEPOSIT"}</Badge></td>
+                  </tr>
+                ))}
+                {!usersQ.isLoading && (usersQ.data?.length ?? 0) === 0 && (
+                  <tr><td colSpan={5} className="p-8 text-center text-xs text-muted-foreground">No registered users found.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </TabsContent>
+
+        {/* TAB 3: INVESTORS */}
         <TabsContent value="investors" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-bold text-foreground">Registered Investor Profiles</h3>
