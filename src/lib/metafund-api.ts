@@ -95,19 +95,20 @@ export interface ReconciliationCheck {
 // ----------------------------------------------------------------------
 
 export async function fetchInvestorSummary(): Promise<InvestorSummary | null> {
-  const { data, error } = await supabase
-    .from("investor_financial_summary")
-    .select("*")
-    .maybeSingle();
+  const { data, error } = await supabase.rpc("get_my_investor_financial_summary");
 
   if (error) throw error;
-  return data as InvestorSummary | null;
+  return (data?.[0] ?? null) as InvestorSummary | null;
 }
 
 export async function fetchInvestorTradeHistory(): Promise<InvestorTradeHistoryRow[]> {
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) throw userError ?? new Error("Authentication required.");
+
   const { data, error } = await supabase
     .from("investor_trade_history")
     .select("*")
+    .eq("user_id", userData.user.id)
     .order("created_at", { ascending: false });
 
   if (error) throw error;
