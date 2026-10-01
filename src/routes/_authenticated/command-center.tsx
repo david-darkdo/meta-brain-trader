@@ -455,7 +455,6 @@ function CommandCenterDashboard() {
   const totalAvailable = Number(cs?.total_available_capital ?? 0);
   const totalCommitted = Number(cs?.total_active_committed_capital ?? 0);
   const totalNetPnl = Number(cs?.net_trading_pnl ?? 0);
-  const pendingCompanyCut = Number(cs?.pending_company_profit_share ?? 0);
   const activeInvestorsCount = Number(cs?.active_investors ?? 0);
 
   return (
@@ -768,12 +767,8 @@ function CommandCenterDashboard() {
             </CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-1">
-            <div className="text-xl sm:text-2xl font-bold font-mono text-foreground">
-              ${pendingCompanyCut.toLocaleString("en-US", { minimumFractionDigits: 2 })}
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {activeInvestorsCount} active investor accounts
-            </p>
+            <div className="text-sm sm:text-base font-semibold text-foreground">Pending cycle settlement</div>
+            <p className="text-[11px] text-muted-foreground mt-0.5">{activeInvestorsCount} active investor accounts · no company share is booked before settlement</p>
           </CardContent>
         </Card>
       </div>
