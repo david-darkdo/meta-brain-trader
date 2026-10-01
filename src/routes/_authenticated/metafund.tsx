@@ -80,7 +80,7 @@ function InvestorMetaFundDashboard() {
 
   const investorId = summaryQ.data?.investor_id || null;
   const isAccountOnboarded = !!investorId;
-  const paymentAccountsQ = useQuery({ queryKey: ["investor", "company_payment_accounts"], queryFn: fetchCompanyPaymentAccounts, enabled: isAccountOnboarded });
+  const paymentAccountsQ = useQuery({ queryKey: ["investor", "company_payment_accounts"], queryFn: fetchCompanyPaymentAccounts });
   const paymentAccounts = paymentAccountsQ.data ?? [];
   const paymentAccountsForCurrency = paymentAccounts.filter((a) => a.currency === depositCurrency);
   const selectedPaymentAccount = paymentAccounts.find((a) => a.id === selectedPaymentAccountId) ?? paymentAccountsForCurrency[0] ?? null;
@@ -123,7 +123,6 @@ function InvestorMetaFundDashboard() {
   // 5. Deposit verification workflow
   const createDepositIntentMutation = useMutation({
     mutationFn: async () => {
-      if (!investorId) throw new Error("Your investor account is not yet activated.");
       const amt = Number(depositAmount);
       if (!Number.isFinite(amt) || amt <= 0) throw new Error("Enter a valid positive deposit amount.");
       if (!selectedPaymentAccount) throw new Error("Select the company account you paid into.");
@@ -250,18 +249,10 @@ function InvestorMetaFundDashboard() {
               MetaFund
             </h1>
             <Badge
-              variant={isAccountOnboarded ? "default" : "outline"}
-              className={`text-[10px] uppercase font-mono tracking-wider ${
-                isAccountOnboarded
-                  ? "bg-amber-500/15 text-amber-400 border border-amber-500/30"
-                  : "text-muted-foreground border-border"
-              }`}
+              variant="outline"
+              className="text-[10px] uppercase font-mono tracking-wider text-amber-400 border border-amber-500/30"
             >
-              {!isAccountOnboarded
-                ? "Not Onboarded"
-                : !hasCapital
-                  ? "Active Investor · Awaiting Deposit"
-                  : "Active Investor"}
+              {!hasCapital ? "Ready to Deposit" : "Active Investor"}
             </Badge>
           </div>
           <p className="text-xs sm:text-sm text-muted-foreground mt-0.5">
@@ -285,7 +276,7 @@ function InvestorMetaFundDashboard() {
             <DialogContent className="sm:max-w-lg bg-card border-border">
               <DialogHeader>
                 <DialogTitle className="text-foreground">{depositStep === "details" ? "Fund Your MetaFund Account" : "Submit Deposit Proof"}</DialogTitle>
-                <DialogDescription>{depositStep === "details" ? "Choose the company payment account, make the transfer, then submit your proof." : "Upload the payment evidence so the company can verify and process your deposit."}</DialogDescription>
+                <DialogDescription>{depositStep === "details" ? "Choose the company payment account, make the transfer, then submit your proof. Your deposit will remain pending until the company verifies it." : "Upload the payment evidence so the company can verify and process your deposit."}</DialogDescription>
               </DialogHeader>
               {!isAccountOnboarded ? (
                 <div className="py-5 text-center"><Info className="mx-auto h-8 w-8 text-amber-400" /><h4 className="mt-2 text-sm font-semibold">Investor Account Not Active</h4><p className="text-xs text-muted-foreground">Your MetaFund account must be opened by the company before you can deposit.</p></div>
