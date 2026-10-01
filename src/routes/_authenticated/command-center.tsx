@@ -68,6 +68,12 @@ import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/command-center")({
   head: () => ({ meta: [{ title: "Command Center — Administrative Control" }] }),
+  beforeLoad: async ({ location }) => {
+    const { data, error } = await supabase.auth.getUser();
+    if (error || !data?.user) throw redirect({ to: "/auth", search: { redirect: location.pathname } });
+    const { data: isAdmin, error: roleError } = await supabase.rpc("is_admin", { p_user_id: data.user.id });
+    if (roleError || !isAdmin) throw redirect({ to: "/profile" });
+  },
   component: CommandCenterDashboard,
 });
 
@@ -76,7 +82,7 @@ function CommandCenterDashboard() {
 
   // Active Tab
   const [activeTab, setActiveTab] = useState<
-    "overview" | "investors" | "capital" | "cycles" | "withdrawals" | "ledger" | "reconciliation" | "audit"
+    "overview" | "investors" | "capital" | "cycles" | "withdrawals" | "ledger" | "payment_accounts" | "reconciliation" | "audit"
   >("overview");
 
   // State for Onboard Investor Dialog
