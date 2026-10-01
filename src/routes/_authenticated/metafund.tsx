@@ -6,7 +6,9 @@ import {
   fetchInvestorTradeHistory,
   fetchInvestorWithdrawalRequests,
   fetchInvestorCapitalEvents,
-  requestInvestorDeposit,
+  fetchCompanyPaymentAccounts,
+  createInvestorDepositIntent,
+  submitInvestorDepositProof,
   requestInvestorWithdrawal,
   type InvestorTradeHistoryRow,
 } from "@/lib/metafund-api";
@@ -57,7 +59,12 @@ function InvestorMetaFundDashboard() {
   const [isDepositModalOpen, setIsDepositModalOpen] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
   const [depositCurrency, setDepositCurrency] = useState("USD");
-  const [depositNotes, setDepositNotes] = useState("");
+  const [depositTransactionId, setDepositTransactionId] = useState("");
+  const [depositProof, setDepositProof] = useState<File | null>(null);
+  const [depositStep, setDepositStep] = useState<"details" | "proof">("details");
+  const [depositIntentId, setDepositIntentId] = useState<string | null>(null);
+  const [selectedPaymentAccountId, setSelectedPaymentAccountId] = useState("");
+  const [depositError, setDepositError] = useState<string | null>(null);
 
   // State for Withdrawal Modal
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
@@ -72,6 +79,9 @@ function InvestorMetaFundDashboard() {
 
   const investorId = summaryQ.data?.investor_id || null;
   const isAccountOnboarded = !!investorId;
+  const paymentAccountsQ = useQuery({ queryKey: ["investor", "company_payment_accounts"], queryFn: fetchCompanyPaymentAccounts, enabled: isAccountOnboarded });
+  const paymentAccounts = paymentAccountsQ.data ?? [];
+  const selectedPaymentAccount = paymentAccounts.find((a) => a.id === selectedPaymentAccountId) ?? paymentAccounts.find((a) => a.currency === depositCurrency) ?? null;
 
   // 2. Fetch Investor Trade Participation History
   const tradeHistoryQ = useQuery({
@@ -94,34 +104,40 @@ function InvestorMetaFundDashboard() {
     enabled: isAccountOnboarded,
   });
 
-  // 5. Deposit Request Mutation
-  const requestDepositMutation = useMutation({
+  // 5. Deposit verification workflow
+  const createDepositIntentMutation = useMutation({
     mutationFn: async () => {
-      if (!investorId) {
-        throw new Error("Your investor account is not yet activated. Contact administration for onboarding.");
-      }
+      if (!investorId) throw new Error("Your investor account is not yet activated.");
       const amt = Number(depositAmount);
-      if (isNaN(amt) || amt <= 0) {
-        throw new Error("Please enter a valid positive deposit amount.");
-      }
+      if (!Number.isFinite(amt) || amt <= 0) throw new Error("Enter a valid positive deposit amount.");
+      if (!selectedPaymentAccount) throw new Error("Select the company account you paid into.");
+      if (!depositProof) throw new Error("Proof of payment is required.");
+      if (depositProof.size > 10 * 1024 * 1024) throw new Error("Proof file must be 10 MB or smaller.");
+      if (!["image/jpeg","image/png","image/webp","application/pdf"].includes(depositProof.type)) throw new Error("Proof must be JPG, PNG, WEBP, or PDF.");
+      return createInvestorDepositIntent({ accountId: investorId, amount: amt, currency: depositCurrency, paymentAccountId: selectedPaymentAccount.id });
+    },
+    onSuccess: (result) => { setDepositIntentId(result.event_id); setDepositStep("proof"); setDepositError(null); },
+    onError: (err: any) => setDepositError(err?.message || "Unable to start deposit verification."),
+  });
 
-      return requestInvestorDeposit({
-        accountId: investorId,
-        amount: amt,
-        currency: depositCurrency,
-        notes: depositNotes || undefined,
-      });
+  const submitDepositProofMutation = useMutation({
+    mutationFn: async () => {
+      if (!depositIntentId || !depositProof) throw new Error("Deposit proof is incomplete.");
+      const { data } = await supabase.auth.getUser();
+      const uid = data.user?.id;
+      if (!uid) throw new Error("Authentication required.");
+      const safeName = depositProof.name.replace(/[^a-zA-Z0-9._-]/g, "_");
+      const storagePath = uid + "/" + depositIntentId + "/" + crypto.randomUUID() + "-" + safeName;
+      const { error: uploadError } = await supabase.storage.from("metafund-deposit-proofs").upload(storagePath, depositProof, { contentType: depositProof.type, upsert: false });
+      if (uploadError) throw uploadError;
+      return submitInvestorDepositProof({ eventId: depositIntentId, transactionReference: depositTransactionId.trim() || undefined, proofStoragePath: storagePath, proofOriginalFilename: depositProof.name, proofContentType: depositProof.type, proofSizeBytes: depositProof.size });
     },
     onSuccess: () => {
-      toast.success("Deposit request submitted. Awaiting administrative confirmation.");
-      setIsDepositModalOpen(false);
-      setDepositAmount("");
-      setDepositNotes("");
+      toast.success("Deposit proof submitted. Your deposit is now locked for company review.");
+      setIsDepositModalOpen(false); setDepositAmount(""); setDepositTransactionId(""); setDepositProof(null); setDepositIntentId(null); setDepositStep("details"); setDepositError(null);
       qc.invalidateQueries({ queryKey: ["investor"] });
     },
-    onError: (err: any) => {
-      toast.error(err?.message || "Failed to submit deposit request.");
-    },
+    onError: (err: any) => setDepositError(err?.message || "Failed to submit deposit proof."),
   });
 
   // 6. Withdrawal Request Mutation
@@ -238,88 +254,32 @@ function InvestorMetaFundDashboard() {
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh
           </Button>
 
-          {/* DEPOSIT DIALOG */}
-          <Dialog open={isDepositModalOpen} onOpenChange={setIsDepositModalOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gold-gradient-btn text-xs h-8">
-                <ArrowDownLeft className="h-3.5 w-3.5 mr-1" /> Deposit
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md bg-card border-border">
+          {/* DEPOSIT VERIFICATION WORKFLOW */}
+          <Dialog open={isDepositModalOpen} onOpenChange={(open) => { setIsDepositModalOpen(open); if (!open) { setDepositStep("details"); setDepositIntentId(null); setDepositError(null); setDepositProof(null); } }}>
+            <DialogTrigger asChild><Button size="sm" className="gold-gradient-btn text-xs h-8"><ArrowDownLeft className="h-3.5 w-3.5 mr-1" /> Deposit</Button></DialogTrigger>
+            <DialogContent className="sm:max-w-lg bg-card border-border">
               <DialogHeader>
-                <DialogTitle className="text-foreground">Deposit Capital into MetaFund</DialogTitle>
-                <DialogDescription>
-                  Submit a deposit request. Capital will be activated upon administrative confirmation.
-                </DialogDescription>
+                <DialogTitle className="text-foreground">{depositStep === "details" ? "Fund Your MetaFund Account" : "Submit Deposit Proof"}</DialogTitle>
+                <DialogDescription>{depositStep === "details" ? "Choose the company payment account, make the transfer, then submit your proof." : "Upload the payment evidence so the company can verify and process your deposit."}</DialogDescription>
               </DialogHeader>
-
               {!isAccountOnboarded ? (
-                <div className="py-4 text-center space-y-2">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-400">
-                    <Info className="h-6 w-6" />
-                  </div>
-                  <h4 className="text-sm font-semibold text-foreground">Onboarding Required</h4>
-                  <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                    Your account has not yet been activated for investment operations. Investment functionality becomes active after administrative onboarding.
-                  </p>
+                <div className="py-5 text-center"><Info className="mx-auto h-8 w-8 text-amber-400" /><h4 className="mt-2 text-sm font-semibold">Investor Account Not Active</h4><p className="text-xs text-muted-foreground">Your MetaFund account must be opened by the company before you can deposit.</p></div>
+              ) : depositStep === "details" ? (
+                <div className="space-y-4 py-2">
+                  {paymentAccounts.length === 0 ? (
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4"><div className="flex items-center gap-2 text-amber-400 text-sm font-semibold"><AlertCircle className="h-4 w-4" /> Company payment account not configured</div><p className="mt-1 text-xs text-muted-foreground">No verified company deposit account is published. Deposits are blocked until one is configured.</p></div>
+                  ) : (<>
+                    <div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Deposit Currency</Label><select className="w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm text-foreground" value={depositCurrency} onChange={(e) => { const c=e.target.value; setDepositCurrency(c); setSelectedPaymentAccountId(paymentAccounts.find(a=>a.currency===c)?.id || ""); }}>{[...new Set(paymentAccounts.map(a=>a.currency))].map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+                    {selectedPaymentAccount && <div className="rounded-xl border border-amber-500/30 bg-secondary/40 p-4 space-y-3"><div className="flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold">Verified Company Deposit Account</span><Badge variant="outline" className="text-[10px]">{selectedPaymentAccount.currency}</Badge></div><div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs"><div><div className="text-muted-foreground">Bank</div><div className="font-semibold">{selectedPaymentAccount.bank_name || "—"}</div></div><div><div className="text-muted-foreground">Account Name</div><div className="font-semibold">{selectedPaymentAccount.account_name || "—"}</div></div><div><div className="text-muted-foreground">Account Number</div><div className="font-mono font-semibold">{selectedPaymentAccount.account_number || "—"}</div></div>{selectedPaymentAccount.routing_code && <div><div className="text-muted-foreground">Routing / Sort Code</div><div className="font-mono font-semibold">{selectedPaymentAccount.routing_code}</div></div>}{selectedPaymentAccount.swift_code && <div><div className="text-muted-foreground">SWIFT</div><div className="font-mono font-semibold">{selectedPaymentAccount.swift_code}</div></div>}</div>{selectedPaymentAccount.instructions && <div className="pt-2 border-t border-border/60 text-xs text-muted-foreground whitespace-pre-wrap">{selectedPaymentAccount.instructions}</div>}</div>}
+                    <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label htmlFor="deposit-amount" className="text-xs">Amount Deposited</Label><Input id="deposit-amount" type="number" min="0.01" step="any" value={depositAmount} onChange={e=>setDepositAmount(e.target.value)} /></div><div className="space-y-1.5"><Label htmlFor="deposit-tx" className="text-xs">Transaction ID (Optional)</Label><Input id="deposit-tx" value={depositTransactionId} onChange={e=>setDepositTransactionId(e.target.value)} placeholder="Bank / transfer reference" /></div></div>
+                    <div className="space-y-1.5"><Label htmlFor="deposit-proof" className="text-xs">Proof of Payment</Label><Input id="deposit-proof" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={e=>setDepositProof(e.target.files?.[0] || null)} /><p className="text-[10px] text-muted-foreground">Required · JPG, PNG, WEBP or PDF · maximum 10 MB</p></div>
+                    {depositError && <p className="text-xs text-destructive">{depositError}</p>}
+                  </>)}
                 </div>
               ) : (
-                <div className="space-y-4 py-3">
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="deposit-amount" className="text-xs text-muted-foreground">Amount</Label>
-                      <Input
-                        id="deposit-amount"
-                        type="number"
-                        step="any"
-                        placeholder="e.g. 5000"
-                        value={depositAmount}
-                        onChange={(e) => setDepositAmount(e.target.value)}
-                        className="bg-secondary/50 border-border focus-visible:ring-amber-400"
-                      />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="deposit-currency" className="text-xs text-muted-foreground">Currency</Label>
-                      <select
-                        id="deposit-currency"
-                        className="w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm text-foreground focus-visible:ring-1 focus-visible:ring-amber-400"
-                        value={depositCurrency}
-                        onChange={(e) => setDepositCurrency(e.target.value)}
-                      >
-                        <option value="USD">USD ($)</option>
-                        <option value="EUR">EUR (€)</option>
-                        <option value="GBP">GBP (£)</option>
-                        <option value="NGN">NGN (₦)</option>
-                      </select>
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="deposit-notes" className="text-xs text-muted-foreground">Reference / Transaction Note (Optional)</Label>
-                    <Input
-                      id="deposit-notes"
-                      placeholder="e.g. Wire transfer / Bank deposit ref"
-                      value={depositNotes}
-                      onChange={(e) => setDepositNotes(e.target.value)}
-                      className="bg-secondary/50 border-border focus-visible:ring-amber-400"
-                    />
-                  </div>
-                </div>
+                <div className="space-y-4 py-3"><div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4"><div className="text-xs font-semibold text-emerald-400">Deposit intent created</div><p className="mt-1 text-xs text-muted-foreground">{"$"}{Number(depositAmount || 0).toLocaleString()} {depositCurrency} is not counted as capital yet. Submit the evidence to lock it for company verification.</p></div><div className="space-y-1.5"><Label htmlFor="deposit-proof-final" className="text-xs">Proof of Payment</Label><Input id="deposit-proof-final" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={e=>setDepositProof(e.target.files?.[0] || null)} />{depositProof && <p className="text-xs text-muted-foreground">{depositProof.name} · {(depositProof.size/1024/1024).toFixed(2)} MB</p>}</div><div className="space-y-1.5"><Label htmlFor="deposit-tx-final" className="text-xs">Transaction ID (Optional)</Label><Input id="deposit-tx-final" value={depositTransactionId} onChange={e=>setDepositTransactionId(e.target.value)} /></div>{depositError && <p className="text-xs text-destructive">{depositError}</p>}</div>
               )}
-
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsDepositModalOpen(false)}>
-                  Cancel
-                </Button>
-                {isAccountOnboarded && (
-                  <Button
-                    className="gold-gradient-btn"
-                    disabled={requestDepositMutation.isPending || !depositAmount}
-                    onClick={() => requestDepositMutation.mutate()}
-                  >
-                    {requestDepositMutation.isPending ? "Submitting..." : "Submit Deposit Request"}
-                  </Button>
-                )}
-              </DialogFooter>
+              <DialogFooter><Button variant="outline" onClick={()=>setIsDepositModalOpen(false)}>Cancel</Button>{isAccountOnboarded && paymentAccounts.length>0 && depositStep==="details" && <Button className="gold-gradient-btn" disabled={createDepositIntentMutation.isPending || !depositAmount || !selectedPaymentAccount || !depositProof} onClick={()=>createDepositIntentMutation.mutate()}>{createDepositIntentMutation.isPending ? "Preparing..." : "Continue to Proof Submission"}</Button>}{isAccountOnboarded && depositStep==="proof" && <Button className="gold-gradient-btn" disabled={submitDepositProofMutation.isPending || !depositProof} onClick={()=>submitDepositProofMutation.mutate()}>{submitDepositProofMutation.isPending ? "Submitting..." : "Submit Proof for Verification"}</Button>}</DialogFooter>
             </DialogContent>
           </Dialog>
 
