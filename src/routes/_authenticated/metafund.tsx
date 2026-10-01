@@ -608,10 +608,10 @@ function InvestorMetaFundDashboard() {
 
       {/* 5. DETAILED TABS SECTION */}
       <div className="space-y-4 pt-2">
-        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="space-y-4">
-          <div className="flex items-center justify-between border-b border-border/70 pb-2">
-            <TabsList className="bg-secondary/40 border border-border/60">
-              <TabsTrigger value="overview" className="text-xs data-[state=active]:text-amber-400">
+        <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="w-full min-w-0 space-y-4">
+          <div className="min-w-0 w-full border-b border-border/70 pb-2">
+            <TabsList className="flex w-full max-w-full flex-nowrap overflow-x-auto justify-start bg-secondary/40 border border-border/60 scrollbar-none">
+              <TabsTrigger value="overview" className="shrink-0 whitespace-nowrap text-xs data-[state=active]:text-amber-400">
                 Overview
               </TabsTrigger>
               <TabsTrigger value="trades" className="text-xs data-[state=active]:text-amber-400">
