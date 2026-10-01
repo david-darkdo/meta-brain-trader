@@ -201,13 +201,20 @@ export async function fetchAdminRegisteredUsers(): Promise<AdminRegisteredUser[]
 }
 
 export async function fetchAllInvestors() {
-  const { data, error } = await supabase
-    .from("investor_accounts")
-    .select("*, users(email)")
-    .order("created_at", { ascending: false });
-
+  // Admin investor selection must use the admin RPC because investor_accounts/users
+  // are intentionally RLS-protected from broad authenticated table reads.
+  const { data, error } = await supabase.rpc("admin_list_registered_users");
   if (error) throw error;
-  return data ?? [];
+  return (data ?? [])
+    .filter((row: any) => row.investor_account_id)
+    .map((row: any) => ({
+      id: row.investor_account_id,
+      user_id: row.user_id,
+      account_number: row.investor_account_number,
+      status: row.investor_status,
+      currency: row.investor_currency,
+      users: { email: row.email },
+    }));
 }
 
 export async function fetchAllCapitalEvents() {
