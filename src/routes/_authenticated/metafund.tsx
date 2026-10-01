@@ -82,7 +82,11 @@ function InvestorMetaFundDashboard() {
   const isAccountOnboarded = !!investorId;
   const paymentAccountsQ = useQuery({ queryKey: ["investor", "company_payment_accounts"], queryFn: fetchCompanyPaymentAccounts, enabled: isAccountOnboarded });
   const paymentAccounts = paymentAccountsQ.data ?? [];
-  const selectedPaymentAccount = paymentAccounts.find((a) => a.id === selectedPaymentAccountId) ?? paymentAccounts.find((a) => a.currency === depositCurrency) ?? null;
+  const paymentAccountsForCurrency = paymentAccounts.filter((a) => a.currency === depositCurrency);
+  const selectedPaymentAccount =
+    paymentAccounts.find((a) => a.id === selectedPaymentAccountId) ??
+    paymentAccountsForCurrency[0] ??
+    null;
 
   // 2. Fetch Investor Trade Participation History
   const tradeHistoryQ = useQuery({
@@ -173,6 +177,16 @@ function InvestorMetaFundDashboard() {
   });
 
   const s = summaryQ.data;
+
+  const copyPaymentDetail = async (value: string | null | undefined, label: string) => {
+    if (!value) return;
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} copied`);
+    } catch {
+      toast.error(`Unable to copy ${label.toLowerCase()}`);
+    }
+  };
 
   // Loading State
   if (summaryQ.isLoading) {
@@ -270,8 +284,46 @@ function InvestorMetaFundDashboard() {
                   {paymentAccounts.length === 0 ? (
                     <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4"><div className="flex items-center gap-2 text-amber-400 text-sm font-semibold"><AlertCircle className="h-4 w-4" /> Company payment account not configured</div><p className="mt-1 text-xs text-muted-foreground">No verified company deposit account is published. Deposits are blocked until one is configured.</p></div>
                   ) : (<>
-                    <div className="space-y-1.5"><Label className="text-xs text-muted-foreground">Deposit Currency</Label><select className="w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm text-foreground" value={depositCurrency} onChange={(e) => { const c=e.target.value; setDepositCurrency(c); setSelectedPaymentAccountId(paymentAccounts.find(a=>a.currency===c)?.id || ""); }}>{[...new Set(paymentAccounts.map(a=>a.currency))].map(c=><option key={c} value={c}>{c}</option>)}</select></div>
-                    {selectedPaymentAccount && <div className="rounded-xl border border-amber-500/30 bg-secondary/40 p-4 space-y-3"><div className="flex items-center justify-between"><span className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold">Verified Company Deposit Account</span><Badge variant="outline" className="text-[10px]">{selectedPaymentAccount.currency}</Badge></div><div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs"><div><div className="text-muted-foreground">Bank</div><div className="font-semibold">{selectedPaymentAccount.bank_name || "—"}</div></div><div><div className="text-muted-foreground">Account Name</div><div className="font-semibold">{selectedPaymentAccount.account_name || "—"}</div></div><div><div className="text-muted-foreground">Account Number</div><div className="font-mono font-semibold">{selectedPaymentAccount.account_number || "—"}</div></div>{selectedPaymentAccount.routing_code && <div><div className="text-muted-foreground">Routing / Sort Code</div><div className="font-mono font-semibold">{selectedPaymentAccount.routing_code}</div></div>}{selectedPaymentAccount.swift_code && <div><div className="text-muted-foreground">SWIFT</div><div className="font-mono font-semibold">{selectedPaymentAccount.swift_code}</div></div>}</div>{selectedPaymentAccount.instructions && <div className="pt-2 border-t border-border/60 text-xs text-muted-foreground whitespace-pre-wrap">{selectedPaymentAccount.instructions}</div>}</div>}
+                    <div className="space-y-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Deposit Currency / Asset</Label>
+                        <select className="w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm text-foreground" value={depositCurrency} onChange={(e) => { const c=e.target.value; setDepositCurrency(c); setSelectedPaymentAccountId(paymentAccounts.find(a=>a.currency===c)?.id || ""); }}>
+                          {[...new Set(paymentAccounts.map(c=>c.currency))].map(c=><option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      {paymentAccountsForCurrency.length > 1 && (
+                        <div className="space-y-1.5">
+                          <Label className="text-xs text-muted-foreground">Receiving Account</Label>
+                          <select className="w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm text-foreground" value={selectedPaymentAccount?.id || ""} onChange={(e) => setSelectedPaymentAccountId(e.target.value)}>
+                            {paymentAccountsForCurrency.map(a=><option key={a.id} value={a.id}>{a.label}{a.network ? ` · ${a.network}` : ""}</option>)}
+                          </select>
+                        </div>
+                      )}
+                    </div>
+                    {selectedPaymentAccount && <div className="rounded-xl border border-amber-500/30 bg-secondary/40 p-4 space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div>
+                          <span className="text-[10px] uppercase tracking-wider text-amber-400 font-semibold">Verified Company Deposit Account</span>
+                          <div className="text-sm font-semibold text-foreground mt-1">{selectedPaymentAccount.label}</div>
+                        </div>
+                        <Badge variant="outline" className="text-[10px]">{selectedPaymentAccount.method_type === "CRYPTO" ? `${selectedPaymentAccount.asset || selectedPaymentAccount.currency} · ${selectedPaymentAccount.network || "Network"}` : selectedPaymentAccount.currency}</Badge>
+                      </div>
+                      {selectedPaymentAccount.method_type === "CRYPTO" ? (
+                        <div className="space-y-3 text-xs">
+                          <div><div className="text-muted-foreground">Wallet Address</div><div className="flex items-center gap-2 mt-1"><div className="font-mono font-semibold break-all flex-1">{selectedPaymentAccount.wallet_address || "—"}</div>{selectedPaymentAccount.wallet_address && <Button type="button" size="sm" variant="outline" className="h-7 shrink-0" onClick={() => copyPaymentDetail(selectedPaymentAccount.wallet_address, "Wallet address")}>Copy</Button>}</div></div>
+                          {selectedPaymentAccount.memo_tag && <div><div className="text-muted-foreground">Memo / Tag</div><div className="flex items-center gap-2 mt-1"><div className="font-mono font-semibold">{selectedPaymentAccount.memo_tag}</div><Button type="button" size="sm" variant="outline" className="h-7" onClick={() => copyPaymentDetail(selectedPaymentAccount.memo_tag, "Memo / tag")}>Copy</Button></div></div>}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                          <div><div className="text-muted-foreground">Bank</div><div className="font-semibold">{selectedPaymentAccount.bank_name || "—"}</div></div>
+                          <div><div className="text-muted-foreground">Account Name</div><div className="font-semibold">{selectedPaymentAccount.account_name || "—"}</div></div>
+                          <div><div className="text-muted-foreground">Account Number</div><div className="flex items-center gap-2"><div className="font-mono font-semibold">{selectedPaymentAccount.account_number || "—"}</div>{selectedPaymentAccount.account_number && <Button type="button" size="sm" variant="outline" className="h-7" onClick={() => copyPaymentDetail(selectedPaymentAccount.account_number, "Account number")}>Copy</Button>}</div></div>
+                          {selectedPaymentAccount.routing_code && <div><div className="text-muted-foreground">Routing / Sort Code</div><div className="font-mono font-semibold">{selectedPaymentAccount.routing_code}</div></div>}
+                          {selectedPaymentAccount.swift_code && <div><div className="text-muted-foreground">SWIFT</div><div className="font-mono font-semibold">{selectedPaymentAccount.swift_code}</div></div>}
+                        </div>
+                      )}
+                      {selectedPaymentAccount.instructions && <div className="pt-2 border-t border-border/60 text-xs text-muted-foreground whitespace-pre-wrap">{selectedPaymentAccount.instructions}</div>}
+                    </div>
                     <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label htmlFor="deposit-amount" className="text-xs">Amount Deposited</Label><Input id="deposit-amount" type="number" min="0.01" step="any" value={depositAmount} onChange={e=>setDepositAmount(e.target.value)} /></div><div className="space-y-1.5"><Label htmlFor="deposit-tx" className="text-xs">Transaction ID (Optional)</Label><Input id="deposit-tx" value={depositTransactionId} onChange={e=>setDepositTransactionId(e.target.value)} placeholder="Bank / transfer reference" /></div></div>
                     <div className="space-y-1.5"><Label htmlFor="deposit-proof" className="text-xs">Proof of Payment</Label><Input id="deposit-proof" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" onChange={e=>setDepositProof(e.target.files?.[0] || null)} /><p className="text-[10px] text-muted-foreground">Required · JPG, PNG, WEBP or PDF · maximum 10 MB</p></div>
                     {depositError && <p className="text-xs text-destructive">{depositError}</p>}
