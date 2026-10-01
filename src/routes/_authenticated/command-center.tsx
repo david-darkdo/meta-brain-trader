@@ -823,7 +823,7 @@ function CommandCenterDashboard() {
       <Tabs value={activeTab} onValueChange={(v: any) => setActiveTab(v)} className="space-y-4">
         <div className="border-b border-border/70 pb-2">
           <TabsList className="bg-secondary/40 border border-border/60 flex-wrap h-auto p-1 gap-1">
-            <TabsTrigger value="overview" className="text-xs data-[state=active]:text-amber-400">
+            <TabsTrigger value="overview" className="shrink-0 whitespace-nowrap text-xs data-[state=active]:text-amber-400">
               Overview
             </TabsTrigger>
             <TabsTrigger value="investors" className="text-xs data-[state=active]:text-amber-400">
