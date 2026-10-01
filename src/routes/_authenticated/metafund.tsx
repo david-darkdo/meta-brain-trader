@@ -126,7 +126,7 @@ function InvestorMetaFundDashboard() {
       const amt = Number(depositAmount);
       if (!Number.isFinite(amt) || amt <= 0) throw new Error("Enter a valid positive deposit amount.");
       if (!selectedPaymentAccount) throw new Error("Select the company account you paid into.");
-      return createInvestorDepositIntent({ accountId: investorId, amount: amt, currency: depositCurrency, paymentAccountId: selectedPaymentAccount.id });
+      return createInvestorDepositIntent({ accountId: investorId ?? null, amount: amt, currency: depositCurrency, paymentAccountId: selectedPaymentAccount.id });
     },
     onSuccess: (result) => { setDepositIntentId(result.event_id); setDepositStep("proof"); setDepositError(null); },
     onError: (err: any) => setDepositError(err?.message || "Unable to start deposit verification."),
@@ -448,55 +448,29 @@ function InvestorMetaFundDashboard() {
         </div>
       </div>
 
-      {/* 2. NON-BLOCKING ACCOUNT STATE BANNER (For State A & State B) */}
-      {!isAccountOnboarded ? (
-        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
-              <ShieldCheck className="h-5 w-5" />
-            </div>
-            <div>
-              <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider">
-                Investor Account Status: Not Yet Activated
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Your MetaFund dashboard is ready. Full investment functionality becomes active after onboarding.
-              </p>
-            </div>
+      {/* 2. DEPOSIT ACCESS */}
+      <div className="rounded-xl border border-border bg-card/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-emerald-400 border border-emerald-500/20">
+            <ShieldCheck className="h-5 w-5" />
           </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setIsDepositModalOpen(true)}
-            className="text-xs border-amber-500/30 text-amber-400 shrink-0"
-          >
-            Learn More
-          </Button>
-        </div>
-      ) : !hasCapital ? (
-        <div className="rounded-xl border border-border bg-card/60 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-emerald-400 border border-emerald-500/20">
-              <CheckCircle2 className="h-5 w-5" />
+          <div>
+            <div className="text-xs font-semibold text-foreground uppercase tracking-wider">
+              {!hasCapital ? "Ready to Deposit" : `MetaFund Account: Active · Account #${s?.account_number || "—"}`}
             </div>
-            <div>
-              <div className="text-xs font-semibold text-foreground uppercase tracking-wider">
-                Investor Account: Active · Account #{s?.account_number || "—"}
-              </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Your investor profile is active with $0.00 allocated capital. Make your first deposit to participate in trading cycles.
-              </p>
-            </div>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              {!hasCapital ? "Choose the company receiving account, make your transfer, then submit proof for company verification." : "Your capital is active. You can make additional deposits or manage your account."}
+            </p>
           </div>
-          <Button
-            size="sm"
-            onClick={() => setIsDepositModalOpen(true)}
-            className="gold-gradient-btn text-xs shrink-0"
-          >
-            <ArrowDownLeft className="h-3.5 w-3.5 mr-1" /> Deposit Capital
-          </Button>
         </div>
-      ) : null}
+        <Button
+          size="sm"
+          onClick={() => setIsDepositModalOpen(true)}
+          className="gold-gradient-btn text-xs shrink-0"
+        >
+          <ArrowDownLeft className="h-3.5 w-3.5 mr-1" /> Deposit Capital
+        </Button>
+      </div>
 
       {/* 3. HERO TOTAL ECONOMIC EQUITY CARD */}
       <div className="relative overflow-hidden rounded-2xl gold-card-hero p-5 sm:p-7">
