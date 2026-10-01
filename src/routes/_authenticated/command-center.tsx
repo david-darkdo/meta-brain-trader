@@ -856,9 +856,6 @@ function CommandCenterDashboard() {
         <TabsContent value="investors" className="space-y-4">
           <div className="flex justify-between items-center">
             <h3 className="text-sm font-bold text-foreground">Registered Investor Profiles</h3>
-            <Button size="sm" onClick={() => setIsOnboardOpen(true)} className="gold-gradient-btn text-xs h-8">
-              <UserPlus className="h-3.5 w-3.5 mr-1" /> Onboard Investor
-            </Button>
           </div>
 
           <div className="rounded-xl border border-border/70 overflow-hidden bg-card/60">
@@ -869,7 +866,7 @@ function CommandCenterDashboard() {
                   <th className="p-3">User / Email</th>
                   <th className="p-3">Currency</th>
                   <th className="p-3">Status</th>
-                  <th className="p-3">Onboarded</th>
+                  <th className="p-3">Created</th>
                   <th className="p-3 text-right">Actions</th>
                 </tr>
               </thead>
