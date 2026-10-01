@@ -44,7 +44,7 @@ function MetaBrainBoardShell() {
   const initials = userQ.data?.initials || "MB";
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex flex-col selection:bg-amber-500/20">
+    <div className="min-h-screen min-w-0 max-w-full overflow-x-hidden bg-background text-foreground flex flex-col selection:bg-amber-500/20">
       {/* 1. GLOBAL BOARD HEADER */}
       <header className="sticky top-0 z-30 border-b border-border/80 bg-background/90 backdrop-blur-xl">
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-2.5 sm:px-6">
@@ -77,7 +77,7 @@ function MetaBrainBoardShell() {
       </header>
 
       {/* 2. ACTIVE PLATFORM CONTENT SURFACE */}
-      <main className="flex-1 mx-auto w-full max-w-4xl px-4 py-5 sm:px-6 sm:py-7 pb-24 sm:pb-24">
+      <main className="flex-1 min-w-0 w-full max-w-full mx-auto px-3 py-5 sm:max-w-4xl sm:px-6 sm:py-7 pb-24 sm:pb-24 overflow-x-hidden">
         <Outlet />
       </main>
 
@@ -86,7 +86,7 @@ function MetaBrainBoardShell() {
         aria-label="MetaBrain Board Global Navigation"
         className="fixed bottom-0 inset-x-0 z-40 border-t border-border/80 bg-background/95 backdrop-blur-xl shadow-[0_-4px_25px_rgba(0,0,0,0.4)]"
       >
-        <div className="mx-auto flex max-w-md items-center justify-around px-2 py-1.5 sm:py-2">
+        <div className="mx-auto flex w-full max-w-md items-center justify-around px-1.5 py-1.5 sm:px-2 sm:py-2">
           {BOARD_PLATFORMS.map((platform) => {
             const isActive = platform.id === activePlatformId;
             const Icon = platform.icon;
