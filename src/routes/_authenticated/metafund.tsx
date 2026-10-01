@@ -470,7 +470,20 @@ function InvestorMetaFundDashboard() {
         </Button>
       </div>
 
-      {/* 3. HERO TOTAL ECONOMIC EQUITY CARD */}
+      {/* 3. PENDING DEPOSIT STATUS */}
+      {(capitalEventsQ.data ?? []).some((event: any) => event.status === "PENDING") && (
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 flex items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-400 border border-amber-500/20">
+            <Clock className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="text-xs font-semibold text-amber-400 uppercase tracking-wider">Deposit Processing</div>
+            <p className="text-xs text-muted-foreground mt-0.5">Your deposit proof has been submitted and is waiting for company verification. Capital will appear after approval.</p>
+          </div>
+        </div>
+      )}
+
+      {/* 4. HERO TOTAL ECONOMIC EQUITY CARD */}
       <div className="relative overflow-hidden rounded-2xl gold-card-hero p-5 sm:p-7">
         <div className="flex flex-col space-y-4">
           <div className="flex items-center justify-between">
