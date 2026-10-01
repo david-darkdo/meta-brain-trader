@@ -1415,7 +1415,21 @@ function CommandCenterDashboard() {
                   </>
                 ) : (
                   <>
-                    <div><Label className="text-xs">Crypto Asset</Label><Input value={paymentAsset} onChange={e=>setPaymentAsset(e.target.value.toUpperCase())} placeholder="BTC or USDT" /></div>
+                    <div>
+  <Label className="text-xs">Crypto Asset</Label>
+  <select
+    className="mt-1 w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm text-foreground"
+    value={paymentAsset}
+    onChange={e=>setPaymentAsset(e.target.value)}
+  >
+    <option value="BTC">BTC — Bitcoin</option>
+    <option value="ETH">ETH — Ethereum</option>
+    <option value="USDT">USDT — Tether</option>
+    <option value="USDC">USDC — USD Coin</option>
+    <option value="BNB">BNB — BNB</option>
+    <option value="TRX">TRX — TRON</option>
+  </select>
+</div>
                     <div><Label className="text-xs">Network</Label><Input value={paymentNetwork} onChange={e=>setPaymentNetwork(e.target.value)} placeholder="BTC, TRC20, ERC20, BEP20..." /></div>
                     <div className="sm:col-span-2"><Label className="text-xs">Wallet Address</Label><Input value={paymentWalletAddress} onChange={e=>setPaymentWalletAddress(e.target.value)} placeholder="Paste the exact receiving wallet address" className="font-mono" /></div>
                     <div><Label className="text-xs">Memo / Tag (Optional)</Label><Input value={paymentMemoTag} onChange={e=>setPaymentMemoTag(e.target.value)} /></div>
