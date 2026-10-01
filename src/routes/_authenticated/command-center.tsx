@@ -262,24 +262,26 @@ function CommandCenterDashboard() {
         throw new Error("Crypto asset, network and wallet address are required.");
       }
 
-      const { data, error } = await supabase.rpc("admin_save_company_payment_account", {
-        p_id: paymentEditingId,
+      const rpcName = paymentEditingId ? "admin_update_company_payment_account" : "admin_create_company_payment_account";
+      const rpcArgs = {
         p_label: paymentLabel,
         p_method_type: paymentMethodType,
         p_currency: paymentMethodType === "CRYPTO" ? paymentAsset.toUpperCase() : paymentCurrency.toUpperCase(),
-        p_bank_name: paymentMethodType === "BANK" ? paymentBankName || null : null,
-        p_account_name: paymentMethodType === "BANK" ? paymentAccountName : null,
-        p_account_number: paymentMethodType === "BANK" ? paymentAccountNumber : null,
-        p_routing_code: paymentMethodType === "BANK" ? paymentRoutingCode || null : null,
-        p_swift_code: paymentMethodType === "BANK" ? paymentSwiftCode || null : null,
-        p_asset: paymentMethodType === "CRYPTO" ? paymentAsset.toUpperCase() : null,
-        p_network: paymentMethodType === "CRYPTO" ? paymentNetwork : null,
-        p_wallet_address: paymentMethodType === "CRYPTO" ? paymentWalletAddress : null,
-        p_memo_tag: paymentMethodType === "CRYPTO" ? paymentMemoTag || null : null,
-        p_instructions: paymentInstructions || null,
+        p_bank_name: paymentMethodType === "BANK" ? paymentBankName : "",
+        p_account_name: paymentMethodType === "BANK" ? paymentAccountName : "",
+        p_account_number: paymentMethodType === "BANK" ? paymentAccountNumber : "",
+        p_routing_code: paymentMethodType === "BANK" ? paymentRoutingCode : "",
+        p_swift_code: paymentMethodType === "BANK" ? paymentSwiftCode : "",
+        p_asset: paymentMethodType === "CRYPTO" ? paymentAsset.toUpperCase() : "",
+        p_network: paymentMethodType === "CRYPTO" ? paymentNetwork : "",
+        p_wallet_address: paymentMethodType === "CRYPTO" ? paymentWalletAddress : "",
+        p_memo_tag: paymentMethodType === "CRYPTO" ? paymentMemoTag : "",
+        p_instructions: paymentInstructions,
         p_is_active: true,
         p_display_order: 0,
-      });
+        ...(paymentEditingId ? { p_id: paymentEditingId } : {}),
+      };
+      const { data, error } = await supabase.rpc(rpcName, rpcArgs as any);
       if (error) throw error;
       return data;
     },
