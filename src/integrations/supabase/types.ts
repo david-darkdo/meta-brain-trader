@@ -1559,7 +1559,11 @@ export type Database = {
             }
             Returns: Json
           }
-      activate_investment_cycle: { Args: { p_cycle_id: string }; Returns: Json }
+      approve_withdrawal: {
+      Args: { p_admin_notes?: string; p_request_id: string }
+      Returns: Json
+    }
+    activate_investment_cycle: { Args: { p_cycle_id: string }; Returns: Json }
       admin_create_company_payment_account: {
         Args: {
           p_account_name: string
@@ -1804,6 +1808,28 @@ export type Database = {
           p_amount: number
           p_idempotency_key?: string
           p_notes?: string
+        }
+        Returns: Json
+      }
+      request_withdrawal_with_details: {
+        Args: {
+          p_account_id: string
+          p_amount: number
+          p_idempotency_key?: string
+          p_notes?: string
+          p_payout_details?: Json
+        }
+        Returns: Json
+      }
+      save_trade_result_and_allocate: {
+        Args: {
+          p_closing_price?: number
+          p_outcome: string
+          p_pnl_amount?: number
+          p_pnl_percent?: number
+          p_result_notes?: string
+          p_rr_achieved?: number
+          p_trade_id: string
         }
         Returns: Json
       }
