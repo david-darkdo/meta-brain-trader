@@ -76,6 +76,7 @@ function InvestorMetaFundDashboard() {
   const summaryQ = useQuery({
     queryKey: ["investor", "financial_summary"],
     queryFn: fetchInvestorSummary,
+    refetchInterval: 15000,
   });
 
   const investorId = summaryQ.data?.investor_id || null;
@@ -118,6 +119,7 @@ function InvestorMetaFundDashboard() {
     queryKey: ["investor", "capital_events", investorId],
     queryFn: () => (investorId ? fetchInvestorCapitalEvents(investorId) : Promise.resolve([])),
     enabled: isAccountOnboarded,
+    refetchInterval: 15000,
   });
 
   // 5. Deposit verification workflow
