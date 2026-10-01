@@ -262,8 +262,7 @@ function CommandCenterDashboard() {
         throw new Error("Crypto asset, network and wallet address are required.");
       }
 
-      const rpcName = paymentEditingId ? "admin_update_company_payment_account" : "admin_create_company_payment_account";
-      const rpcArgs = {
+      const commonArgs = {
         p_label: paymentLabel,
         p_method_type: paymentMethodType,
         p_currency: paymentMethodType === "CRYPTO" ? paymentAsset.toUpperCase() : paymentCurrency.toUpperCase(),
@@ -279,9 +278,11 @@ function CommandCenterDashboard() {
         p_instructions: paymentInstructions,
         p_is_active: true,
         p_display_order: 0,
-        ...(paymentEditingId ? { p_id: paymentEditingId } : {}),
       };
-      const { data, error } = await supabase.rpc(rpcName, rpcArgs as any);
+      const result = paymentEditingId
+        ? await supabase.rpc("admin_update_company_payment_account", { ...commonArgs, p_id: paymentEditingId })
+        : await supabase.rpc("admin_create_company_payment_account", commonArgs);
+      const { data, error } = result;
       if (error) throw error;
       return data;
     },
