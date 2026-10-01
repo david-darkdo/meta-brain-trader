@@ -1747,6 +1747,26 @@ export type Database = {
         }
         Returns: Json
       }
+      get_my_investor_financial_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          account_number: string | null
+          account_status: Database["public"]["Enums"]["investor_account_status"]
+          active_committed_capital: number
+          available_capital: number
+          closed_trades_count: number
+          cumulative_deposited: number
+          cumulative_withdrawn: number
+          currency: string
+          current_contributed_capital: number
+          current_economic_equity: number
+          investor_id: string
+          open_trades_count: number
+          realized_trading_pnl: number
+          settled_capital: number
+          user_id: string
+        }[]
+      }
       get_investor_financial_position: {
         Args: { p_investor_id: string }
         Returns: {
