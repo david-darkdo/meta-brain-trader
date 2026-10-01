@@ -104,6 +104,9 @@ function CommandCenterDashboard() {
   const [isRejectOpen, setIsRejectOpen] = useState(false);
   const [selectedWithdrawalId, setSelectedWithdrawalId] = useState("");
   const [rejectReason, setRejectReason] = useState("");
+  const [isSettleOpen, setIsSettleOpen] = useState(false);
+  const [settlementRequestId, setSettlementRequestId] = useState("");
+  const [settlementReference, setSettlementReference] = useState("");
 
   // State for Company Deposit Account
   const [paymentEditingId, setPaymentEditingId] = useState<string | null>(null);
@@ -160,6 +163,7 @@ function CommandCenterDashboard() {
   const withdrawalsQ = useQuery({
     queryKey: ["admin", "withdrawals"],
     queryFn: fetchAllWithdrawals,
+    refetchInterval: 15000,
   });
 
   // 6. Financial Ledger
@@ -419,9 +423,15 @@ function CommandCenterDashboard() {
   });
 
   const settleWithdrawalMutation = useMutation({
-    mutationFn: (requestId: string) => settleWithdrawal(requestId),
+    mutationFn: ({ requestId, reference }: { requestId: string; reference: string }) => {
+      if (!reference.trim()) throw new Error("Settlement reference is required.");
+      return settleWithdrawal(requestId, reference.trim());
+    },
     onSuccess: () => {
-      toast.success("Withdrawal settled and disbursed.");
+      toast.success("Withdrawal marked as disbursed and settled.");
+      setIsSettleOpen(false);
+      setSettlementRequestId("");
+      setSettlementReference("");
       qc.invalidateQueries({ queryKey: ["admin", "withdrawals"] });
       qc.invalidateQueries({ queryKey: ["admin", "company_summary"] });
       qc.invalidateQueries({ queryKey: ["admin", "ledger"] });
@@ -1152,7 +1162,11 @@ function CommandCenterDashboard() {
                         <Button
                           size="sm"
                           className="gold-gradient-btn h-7 text-xs"
-                          onClick={() => settleWithdrawalMutation.mutate(w.id)}
+                          onClick={() => {
+                            setSettlementRequestId(w.id);
+                            setSettlementReference("");
+                            setIsSettleOpen(true);
+                          }}
                           disabled={settleWithdrawalMutation.isPending}
                         >
                           Disburse / Settle
@@ -1164,6 +1178,43 @@ function CommandCenterDashboard() {
               </tbody>
             </table>
           </div>
+
+          {/* SETTLE WITHDRAWAL DIALOG */}
+          <Dialog open={isSettleOpen} onOpenChange={setIsSettleOpen}>
+            <DialogContent className="sm:max-w-md bg-card border-border">
+              <DialogHeader>
+                <DialogTitle className="text-foreground">Record Withdrawal Payout</DialogTitle>
+                <DialogDescription>
+                  Only use this after the payout has actually been sent to the investor's approved destination. Record the bank transfer ID, crypto transaction hash, or other provider reference.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-3">
+                <div className="space-y-1.5">
+                  <Label htmlFor="settlement-ref" className="text-xs text-muted-foreground">Settlement / Payout Reference</Label>
+                  <Input
+                    id="settlement-ref"
+                    placeholder="e.g. bank transfer ID or blockchain transaction hash"
+                    value={settlementReference}
+                    onChange={(e) => setSettlementReference(e.target.value)}
+                    className="bg-secondary/50 border-border font-mono"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  This changes the request from APPROVED to PROCESSED and posts the withdrawal to the financial ledger. It does not send money by itself.
+                </p>
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setIsSettleOpen(false)}>Cancel</Button>
+                <Button
+                  className="gold-gradient-btn"
+                  disabled={settleWithdrawalMutation.isPending || !settlementReference.trim()}
+                  onClick={() => settleWithdrawalMutation.mutate({ requestId: settlementRequestId, reference: settlementReference })}
+                >
+                  {settleWithdrawalMutation.isPending ? "Recording..." : "Confirm Payout Sent"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           {/* REJECT WITHDRAWAL DIALOG */}
           <Dialog open={isRejectOpen} onOpenChange={setIsRejectOpen}>
