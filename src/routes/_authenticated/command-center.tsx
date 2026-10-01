@@ -113,6 +113,16 @@ function CommandCenterDashboard() {
   const [selectedWithdrawalId, setSelectedWithdrawalId] = useState("");
   const [rejectReason, setRejectReason] = useState("");
 
+  // State for Company Deposit Account
+  const [paymentLabel, setPaymentLabel] = useState("");
+  const [paymentCurrency, setPaymentCurrency] = useState("USD");
+  const [paymentBankName, setPaymentBankName] = useState("");
+  const [paymentAccountName, setPaymentAccountName] = useState("");
+  const [paymentAccountNumber, setPaymentAccountNumber] = useState("");
+  const [paymentRoutingCode, setPaymentRoutingCode] = useState("");
+  const [paymentSwiftCode, setPaymentSwiftCode] = useState("");
+  const [paymentInstructions, setPaymentInstructions] = useState("");
+
   // 1. Company Financial Summary
   const companySummaryQ = useQuery({
     queryKey: ["admin", "company_summary"],
@@ -189,6 +199,45 @@ function CommandCenterDashboard() {
   const reconciliationQ = useQuery({
     queryKey: ["admin", "reconciliation"],
     queryFn: runSystemReconciliation,
+  });
+
+  // Company Deposit Accounts
+  const paymentAccountsQ = useQuery({
+    queryKey: ["admin", "payment_accounts"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("company_payment_accounts").select("*").order("display_order", { ascending: true });
+      if (error) throw error;
+      return data ?? [];
+    },
+  });
+
+  const savePaymentAccountMutation = useMutation({
+    mutationFn: async () => {
+      if (!paymentLabel.trim() || !paymentAccountName.trim() || !paymentAccountNumber.trim()) {
+        throw new Error("Label, account name and account number are required.");
+      }
+      const { data, error } = await supabase.rpc("admin_upsert_company_payment_account", {
+        p_label: paymentLabel,
+        p_currency: paymentCurrency,
+        p_bank_name: paymentBankName || null,
+        p_account_name: paymentAccountName,
+        p_account_number: paymentAccountNumber,
+        p_routing_code: paymentRoutingCode || null,
+        p_swift_code: paymentSwiftCode || null,
+        p_instructions: paymentInstructions || null,
+        p_is_active: true,
+        p_display_order: 0,
+      });
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      toast.success("Company deposit account published.");
+      setPaymentLabel(""); setPaymentBankName(""); setPaymentAccountName(""); setPaymentAccountNumber("");
+      setPaymentRoutingCode(""); setPaymentSwiftCode(""); setPaymentInstructions("");
+      qc.invalidateQueries({ queryKey: ["admin", "payment_accounts"] });
+    },
+    onError: (err: any) => toast.error(err?.message || "Failed to publish company deposit account."),
   });
 
   // 9. Audit Logs
@@ -728,6 +777,9 @@ function CommandCenterDashboard() {
             <TabsTrigger value="ledger" className="text-xs data-[state=active]:text-amber-400">
               Ledger
             </TabsTrigger>
+            <TabsTrigger value="payment_accounts" className="text-xs data-[state=active]:text-amber-400">
+              Deposit Accounts ({paymentAccountsQ.data?.length ?? 0})
+            </TabsTrigger>
             <TabsTrigger value="reconciliation" className="text-xs data-[state=active]:text-amber-400">
               Reconciliation
             </TabsTrigger>
@@ -1161,6 +1213,39 @@ function CommandCenterDashboard() {
               ))}
             </div>
           )}
+        </TabsContent>
+
+        {/* TAB: COMPANY DEPOSIT ACCOUNTS */}
+        <TabsContent value="payment_accounts" className="space-y-4">
+          <Card className="bg-card/60 border-border/70">
+            <CardHeader>
+              <CardTitle className="text-sm font-bold">Company Deposit Accounts</CardTitle>
+              <CardDescription className="text-xs">These are the verified company accounts shown to investors before they make a deposit. Publishing an account does not create investor capital.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div><Label className="text-xs">Label</Label><Input value={paymentLabel} onChange={e=>setPaymentLabel(e.target.value)} placeholder="e.g. Company USD Bank Account" /></div>
+                <div><Label className="text-xs">Currency</Label><Input value={paymentCurrency} onChange={e=>setPaymentCurrency(e.target.value.toUpperCase())} maxLength={3} /></div>
+                <div><Label className="text-xs">Bank Name</Label><Input value={paymentBankName} onChange={e=>setPaymentBankName(e.target.value)} /></div>
+                <div><Label className="text-xs">Account Name</Label><Input value={paymentAccountName} onChange={e=>setPaymentAccountName(e.target.value)} /></div>
+                <div><Label className="text-xs">Account Number</Label><Input value={paymentAccountNumber} onChange={e=>setPaymentAccountNumber(e.target.value)} /></div>
+                <div><Label className="text-xs">Routing / Sort Code</Label><Input value={paymentRoutingCode} onChange={e=>setPaymentRoutingCode(e.target.value)} /></div>
+                <div><Label className="text-xs">SWIFT</Label><Input value={paymentSwiftCode} onChange={e=>setPaymentSwiftCode(e.target.value)} /></div>
+                <div className="sm:col-span-2"><Label className="text-xs">Investor Instructions</Label><Input value={paymentInstructions} onChange={e=>setPaymentInstructions(e.target.value)} placeholder="Reference format, transfer instructions, etc." /></div>
+              </div>
+              <Button className="gold-gradient-btn" onClick={()=>savePaymentAccountMutation.mutate()} disabled={savePaymentAccountMutation.isPending}>
+                {savePaymentAccountMutation.isPending ? "Publishing..." : "Publish Deposit Account"}
+              </Button>
+              <div className="space-y-2">
+                {(paymentAccountsQ.data ?? []).map((a:any)=>(
+                  <div key={a.id} className="flex items-center justify-between rounded-lg border border-border/70 p-3 bg-secondary/20">
+                    <div><div className="text-sm font-semibold">{a.label}</div><div className="text-xs text-muted-foreground">{a.currency} · {a.bank_name || "Bank"} · {a.account_number || "No account number"}</div></div>
+                    <Badge variant={a.is_active ? "default" : "outline"}>{a.is_active ? "ACTIVE" : "INACTIVE"}</Badge>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         {/* TAB 8: AUDIT TRAIL */}
