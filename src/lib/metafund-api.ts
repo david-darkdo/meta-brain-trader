@@ -63,6 +63,10 @@ export interface InvestorTradeHistoryRow {
   user_id: string | null;
 }
 
+export interface CompanyPaymentAccount {
+  id: string; label: string; currency: string; bank_name: string | null; account_name: string | null; account_number: string | null; routing_code: string | null; swift_code: string | null; instructions: string | null; is_active: boolean; display_order: number;
+}
+
 export interface ReconciliationCheck {
   check_code: string;
   check_name: string;
@@ -117,19 +121,20 @@ export async function fetchInvestorCapitalEvents(accountId: string) {
   return data ?? [];
 }
 
-export async function requestInvestorDeposit(params: {
-  accountId: string;
-  amount: number;
-  currency?: string;
-  notes?: string;
-}) {
-  const { data, error } = await supabase.rpc("request_deposit", {
-    p_account_id: params.accountId,
-    p_amount: params.amount,
-    p_currency: params.currency || "USD",
-    p_notes: params.notes ?? null,
-  });
+export async function fetchCompanyPaymentAccounts(): Promise<CompanyPaymentAccount[]> {
+  const { data, error } = await supabase.from("company_payment_accounts").select("*").eq("is_active", true).order("display_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as CompanyPaymentAccount[];
+}
 
+export async function createInvestorDepositIntent(params: { accountId: string; amount: number; currency: string; paymentAccountId: string }) {
+  const { data, error } = await supabase.rpc("create_deposit_intent", { p_account_id: params.accountId, p_amount: params.amount, p_currency: params.currency, p_payment_account_id: params.paymentAccountId });
+  if (error) throw error;
+  return data as { status: string; event_id: string; event_status: string };
+}
+
+export async function submitInvestorDepositProof(params: { eventId: string; transactionReference?: string; proofStoragePath: string; proofOriginalFilename: string; proofContentType: string; proofSizeBytes: number }) {
+  const { data, error } = await supabase.rpc("submit_deposit_proof", { p_event_id: params.eventId, p_transaction_reference: params.transactionReference ?? null, p_proof_storage_path: params.proofStoragePath, p_proof_original_filename: params.proofOriginalFilename, p_proof_content_type: params.proofContentType, p_proof_size_bytes: params.proofSizeBytes });
   if (error) throw error;
   return data;
 }
