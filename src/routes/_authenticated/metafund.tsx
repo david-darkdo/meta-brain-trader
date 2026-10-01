@@ -70,6 +70,15 @@ function InvestorMetaFundDashboard() {
   // State for Withdrawal Modal
   const [isWithdrawModalOpen, setIsWithdrawModalOpen] = useState(false);
   const [withdrawalAmount, setWithdrawalAmount] = useState("");
+  const [withdrawalMethod, setWithdrawalMethod] = useState<"BANK" | "CRYPTO">("BANK");
+  const [withdrawalCurrency, setWithdrawalCurrency] = useState("USD");
+  const [withdrawalBankName, setWithdrawalBankName] = useState("");
+  const [withdrawalAccountName, setWithdrawalAccountName] = useState("");
+  const [withdrawalAccountNumber, setWithdrawalAccountNumber] = useState("");
+  const [withdrawalRoutingCode, setWithdrawalRoutingCode] = useState("");
+  const [withdrawalAsset, setWithdrawalAsset] = useState("USDT");
+  const [withdrawalNetwork, setWithdrawalNetwork] = useState("TRC20");
+  const [withdrawalWalletAddress, setWithdrawalWalletAddress] = useState("");
   const [withdrawalNotes, setWithdrawalNotes] = useState("");
 
   // 1. Fetch Investor Financial Summary
@@ -169,9 +178,33 @@ function InvestorMetaFundDashboard() {
         );
       }
 
+      const payoutDetails = withdrawalMethod === "BANK"
+        ? {
+            method: "BANK",
+            currency: withdrawalCurrency,
+            bank_name: withdrawalBankName.trim(),
+            account_name: withdrawalAccountName.trim(),
+            account_number: withdrawalAccountNumber.trim(),
+            routing_code: withdrawalRoutingCode.trim() || null,
+          }
+        : {
+            method: "CRYPTO",
+            asset: withdrawalAsset,
+            network: withdrawalNetwork.trim(),
+            wallet_address: withdrawalWalletAddress.trim(),
+          };
+
+      if (withdrawalMethod === "BANK" && (!payoutDetails.bank_name || !payoutDetails.account_name || !payoutDetails.account_number)) {
+        throw new Error("Bank name, account name and account number are required.");
+      }
+      if (withdrawalMethod === "CRYPTO" && (!payoutDetails.network || !payoutDetails.wallet_address)) {
+        throw new Error("Crypto network and wallet address are required.");
+      }
+
       return requestInvestorWithdrawal({
         accountId: investorId,
         amount: amt,
+        payoutDetails,
         notes: withdrawalNotes || undefined,
       });
     },
@@ -179,6 +212,11 @@ function InvestorMetaFundDashboard() {
       toast.success("Withdrawal request submitted successfully.");
       setIsWithdrawModalOpen(false);
       setWithdrawalAmount("");
+      setWithdrawalBankName("");
+      setWithdrawalAccountName("");
+      setWithdrawalAccountNumber("");
+      setWithdrawalRoutingCode("");
+      setWithdrawalWalletAddress("");
       setWithdrawalNotes("");
       qc.invalidateQueries({ queryKey: ["investor"] });
     },
@@ -409,7 +447,7 @@ function InvestorMetaFundDashboard() {
               </DialogHeader>
               <div className="space-y-4 py-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="amount" className="text-xs text-muted-foreground">Withdrawal Amount ($ USD)</Label>
+                  <Label htmlFor="amount" className="text-xs text-muted-foreground">Withdrawal Amount (USD base)</Label>
                   <Input
                     id="amount"
                     type="number"
@@ -420,16 +458,89 @@ function InvestorMetaFundDashboard() {
                     className="bg-secondary/50 border-border focus-visible:ring-amber-400"
                   />
                 </div>
+
                 <div className="space-y-1.5">
-                  <Label htmlFor="notes" className="text-xs text-muted-foreground">Payout Instructions / Destination</Label>
-                  <Input
-                    id="notes"
-                    placeholder="e.g. USDT TRC20 / Bank account details"
-                    value={withdrawalNotes}
-                    onChange={(e) => setWithdrawalNotes(e.target.value)}
-                    className="bg-secondary/50 border-border focus-visible:ring-amber-400"
-                  />
+                  <Label className="text-xs text-muted-foreground">Payout Method</Label>
+                  <Select value={withdrawalMethod} onValueChange={(v) => setWithdrawalMethod(v as "BANK" | "CRYPTO")}>
+                    <SelectTrigger className="bg-secondary/50 border-border"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="BANK">Bank Account</SelectItem>
+                      <SelectItem value="CRYPTO">Crypto Wallet</SelectItem>
+                    </SelectContent>
+                  </Select>
                 </div>
+
+                {withdrawalMethod === "BANK" ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Payout Currency</Label>
+                        <Select value={withdrawalCurrency} onValueChange={setWithdrawalCurrency}>
+                          <SelectTrigger className="bg-secondary/50 border-border"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="USD">USD</SelectItem>
+                            <SelectItem value="NGN">NGN</SelectItem>
+                            <SelectItem value="EUR">EUR</SelectItem>
+                            <SelectItem value="GBP">GBP</SelectItem>
+                            <SelectItem value="CHF">CHF</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="withdrawal-bank" className="text-xs text-muted-foreground">Bank</Label>
+                        <Input id="withdrawal-bank" value={withdrawalBankName} onChange={(e) => setWithdrawalBankName(e.target.value)} placeholder="Bank name" />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="withdrawal-account-name" className="text-xs text-muted-foreground">Account Name</Label>
+                        <Input id="withdrawal-account-name" value={withdrawalAccountName} onChange={(e) => setWithdrawalAccountName(e.target.value)} />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="withdrawal-account-number" className="text-xs text-muted-foreground">Account Number</Label>
+                        <Input id="withdrawal-account-number" value={withdrawalAccountNumber} onChange={(e) => setWithdrawalAccountNumber(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="withdrawal-routing" className="text-xs text-muted-foreground">Routing / Sort Code (optional)</Label>
+                      <Input id="withdrawal-routing" value={withdrawalRoutingCode} onChange={(e) => setWithdrawalRoutingCode(e.target.value)} />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground">Asset</Label>
+                        <Select value={withdrawalAsset} onValueChange={setWithdrawalAsset}>
+                          <SelectTrigger className="bg-secondary/50 border-border"><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="USDT">USDT</SelectItem>
+                            <SelectItem value="USDC">USDC</SelectItem>
+                            <SelectItem value="BTC">BTC</SelectItem>
+                            <SelectItem value="ETH">ETH</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="withdrawal-network" className="text-xs text-muted-foreground">Network</Label>
+                        <Input id="withdrawal-network" value={withdrawalNetwork} onChange={(e) => setWithdrawalNetwork(e.target.value)} placeholder="TRC20 / ERC20 / BTC" />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="withdrawal-wallet" className="text-xs text-muted-foreground">Wallet Address</Label>
+                      <Input id="withdrawal-wallet" value={withdrawalWalletAddress} onChange={(e) => setWithdrawalWalletAddress(e.target.value)} className="font-mono" placeholder="Paste destination wallet address" />
+                    </div>
+                  </>
+                )}
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="notes" className="text-xs text-muted-foreground">Additional Instructions (optional)</Label>
+                  <Input id="notes" placeholder="Anything the payout team should know" value={withdrawalNotes} onChange={(e) => setWithdrawalNotes(e.target.value)} />
+                </div>
+
+                <p className="text-[11px] text-muted-foreground">
+                  Your withdrawal is a request only. The company reviews the destination, approves it, sends the payout, then records the settlement reference.
+                </p>
               </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setIsWithdrawModalOpen(false)}>
