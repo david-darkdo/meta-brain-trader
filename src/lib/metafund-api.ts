@@ -64,7 +64,22 @@ export interface InvestorTradeHistoryRow {
 }
 
 export interface CompanyPaymentAccount {
-  id: string; label: string; currency: string; bank_name: string | null; account_name: string | null; account_number: string | null; routing_code: string | null; swift_code: string | null; instructions: string | null; is_active: boolean; display_order: number;
+  id: string;
+  label: string;
+  method_type: string;
+  currency: string;
+  bank_name: string | null;
+  account_name: string | null;
+  account_number: string | null;
+  routing_code: string | null;
+  swift_code: string | null;
+  asset: string | null;
+  network: string | null;
+  wallet_address: string | null;
+  memo_tag: string | null;
+  instructions: string | null;
+  is_active: boolean;
+  display_order: number;
 }
 
 export interface ReconciliationCheck {
