@@ -136,6 +136,8 @@ function InvestorMetaFundDashboard() {
   const submitDepositProofMutation = useMutation({
     mutationFn: async () => {
       if (!depositIntentId || !depositProof) throw new Error("Deposit proof is incomplete.");
+      if (depositProof.size > 10 * 1024 * 1024) throw new Error("Proof file must be 10 MB or smaller.");
+      if (!["image/jpeg","image/png","image/webp","application/pdf"].includes(depositProof.type)) throw new Error("Proof must be JPG, PNG, WEBP, or PDF.");
       const { data } = await supabase.auth.getUser();
       const uid = data.user?.id;
       if (!uid) throw new Error("Authentication required.");
