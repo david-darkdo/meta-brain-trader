@@ -1724,10 +1724,10 @@ export type Database = {
       close_investment_cycle: { Args: { p_cycle_id: string }; Returns: Json }
       create_deposit_intent: {
         Args: {
-          p_account_id: string
-          p_amount: number
+          p_account_id?: string | null
+          p_amount?: number
           p_currency?: string
-          p_payment_account_id?: string
+          p_payment_account_id?: string | null
         }
         Returns: Json
       }
