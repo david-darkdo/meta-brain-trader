@@ -1560,11 +1560,102 @@ export type Database = {
             Returns: Json
           }
       activate_investment_cycle: { Args: { p_cycle_id: string }; Returns: Json }
+      admin_create_company_payment_account: {
+        Args: {
+          p_account_name: string
+          p_account_number: string
+          p_asset: string
+          p_bank_name: string
+          p_currency: string
+          p_display_order: number
+          p_instructions: string
+          p_is_active: boolean
+          p_label: string
+          p_memo_tag: string
+          p_method_type: string
+          p_network: string
+          p_routing_code: string
+          p_swift_code: string
+          p_wallet_address: string
+        }
+        Returns: {
+          account_name: string | null
+          account_number: string | null
+          asset: string | null
+          bank_name: string | null
+          created_at: string
+          currency: string
+          display_order: number
+          id: string
+          instructions: string | null
+          is_active: boolean
+          label: string
+          memo_tag: string | null
+          method_type: string
+          network: string | null
+          routing_code: string | null
+          swift_code: string | null
+          updated_at: string
+          wallet_address: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "company_payment_accounts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       admin_deactivate_company_payment_account: {
         Args: { p_id: string }
         Returns: boolean
       }
       admin_save_company_payment_account: {
+        Args: {
+          p_account_name: string
+          p_account_number: string
+          p_asset: string
+          p_bank_name: string
+          p_currency: string
+          p_display_order: number
+          p_id: string
+          p_instructions: string
+          p_is_active: boolean
+          p_label: string
+          p_memo_tag: string
+          p_method_type: string
+          p_network: string
+          p_routing_code: string
+          p_swift_code: string
+          p_wallet_address: string
+        }
+        Returns: {
+          account_name: string | null
+          account_number: string | null
+          asset: string | null
+          bank_name: string | null
+          created_at: string
+          currency: string
+          display_order: number
+          id: string
+          instructions: string | null
+          is_active: boolean
+          label: string
+          memo_tag: string | null
+          method_type: string
+          network: string | null
+          routing_code: string | null
+          swift_code: string | null
+          updated_at: string
+          wallet_address: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "company_payment_accounts"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      admin_update_company_payment_account: {
         Args: {
           p_account_name: string
           p_account_number: string
