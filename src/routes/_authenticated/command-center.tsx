@@ -19,8 +19,6 @@ import {
   approveWithdrawal,
   settleWithdrawal,
   rejectWithdrawal,
-  onboardInvestorAccount,
-  fetchEligibleUsersForOnboarding,
   type ReconciliationCheck,
 } from "@/lib/metafund-api";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -60,7 +58,6 @@ import {
   TrendingUp,
   RefreshCw,
   Sliders,
-  UserPlus,
   ShieldCheck,
   FileCheck2,
 } from "lucide-react";
@@ -84,12 +81,6 @@ function CommandCenterDashboard() {
   const [activeTab, setActiveTab] = useState<
     "overview" | "investors" | "capital" | "cycles" | "withdrawals" | "ledger" | "payment_accounts" | "reconciliation" | "audit"
   >("overview");
-
-  // State for Onboard Investor Dialog
-  const [isOnboardOpen, setIsOnboardOpen] = useState(false);
-  const [onboardUserId, setOnboardUserId] = useState("");
-  const [onboardAccountNum, setOnboardAccountNum] = useState("");
-  const [onboardCurrency, setOnboardCurrency] = useState("USD");
 
   // State for Capital Activation Dialog
   const [isActivateCapitalOpen, setIsActivateCapitalOpen] = useState(false);
@@ -143,36 +134,6 @@ function CommandCenterDashboard() {
   const investorsQ = useQuery({
     queryKey: ["admin", "investors"],
     queryFn: fetchAllInvestors,
-  });
-
-  // Eligible Users for Onboarding
-  const eligibleUsersQ = useQuery({
-    queryKey: ["admin", "eligible_users"],
-    queryFn: fetchEligibleUsersForOnboarding,
-  });
-
-  // Onboard Investor Mutation
-  const onboardInvestorMut = useMutation({
-    mutationFn: async () => {
-      if (!onboardUserId) throw new Error("Please select a user to onboard.");
-      return onboardInvestorAccount({
-        userId: onboardUserId,
-        accountNumber: onboardAccountNum || undefined,
-        currency: onboardCurrency,
-        status: "ACTIVE",
-      });
-    },
-    onSuccess: (acc: any) => {
-      toast.success(`Investor account ${acc?.account_number || ""} created successfully.`);
-      setIsOnboardOpen(false);
-      setOnboardUserId("");
-      setOnboardAccountNum("");
-      qc.invalidateQueries({ queryKey: ["admin", "investors"] });
-      qc.invalidateQueries({ queryKey: ["admin", "company_summary"] });
-    },
-    onError: (err: any) => {
-      toast.error(err?.message || "Failed to onboard investor account.");
-    },
   });
 
   // 3. Capital Events
@@ -512,77 +473,6 @@ function CommandCenterDashboard() {
           >
             <RefreshCw className="h-3.5 w-3.5 mr-1.5" /> Refresh All
           </Button>
-
-          {/* ONBOARD INVESTOR DIALOG */}
-          <Dialog open={isOnboardOpen} onOpenChange={setIsOnboardOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" variant="outline" className="border-amber-500/30 text-amber-400 hover:bg-amber-400/10 text-xs h-8">
-                <UserPlus className="h-3.5 w-3.5 mr-1" /> Onboard Investor
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-md bg-card border-border">
-              <DialogHeader>
-                <DialogTitle className="text-foreground">Onboard Investor Account</DialogTitle>
-                <DialogDescription>
-                  Provision an official investor profile for an authenticated user. Zero capital is created until a capital deposit event is activated.
-                </DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4 py-3">
-                <div className="space-y-1.5">
-                  <Label htmlFor="onboard-user" className="text-xs text-muted-foreground">Select User</Label>
-                  <Select value={onboardUserId} onValueChange={setOnboardUserId}>
-                    <SelectTrigger id="onboard-user" className="bg-secondary/50 border-border">
-                      <SelectValue placeholder="Choose a registered user..." />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border max-h-56">
-                      {eligibleUsersQ.data?.map((u: any) => (
-                        <SelectItem key={u.user_id} value={u.user_id}>
-                          {u.email || u.user_id} ({u.subscription_tier})
-                        </SelectItem>
-                      ))}\n                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="onboard-acc" className="text-xs text-muted-foreground">Account Number (Optional)</Label>
-                    <Input
-                      id="onboard-acc"
-                      placeholder="e.g. MF-10001 (Auto if empty)"
-                      value={onboardAccountNum}
-                      onChange={(e) => setOnboardAccountNum(e.target.value)}
-                      className="bg-secondary/50 border-border focus-visible:ring-amber-400"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="onboard-curr" className="text-xs text-muted-foreground">Account Base Currency</Label>
-                    <Select value={onboardCurrency} onValueChange={setOnboardCurrency}>
-                      <SelectTrigger id="onboard-curr" className="bg-secondary/50 border-border">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-card border-border">
-                        <SelectItem value="USD">USD ($)</SelectItem>
-                        <SelectItem value="EUR">EUR (€)</SelectItem>
-                        <SelectItem value="GBP">GBP (£)</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-              </div>
-              <DialogFooter>
-                <Button variant="outline" onClick={() => setIsOnboardOpen(false)}>
-                  Cancel
-                </Button>
-                <Button
-                  className="gold-gradient-btn"
-                  disabled={onboardInvestorMut.isPending || !onboardUserId}
-                  onClick={() => onboardInvestorMut.mutate()}
-                >
-                  {onboardInvestorMut.isPending ? "Onboarding..." : "Confirm Onboarding"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
 
           {/* ACTIVATE CAPITAL DIALOG */}
           <Dialog open={isActivateCapitalOpen} onOpenChange={setIsActivateCapitalOpen}>
