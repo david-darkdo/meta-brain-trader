@@ -86,7 +86,7 @@ function MetaBrainBoardShell() {
         aria-label="MetaBrain Board Global Navigation"
         className="fixed bottom-0 inset-x-0 z-40 border-t border-border/80 bg-background/95 backdrop-blur-xl shadow-[0_-4px_25px_rgba(0,0,0,0.4)]"
       >
-        <div className="mx-auto flex w-full max-w-md items-center justify-around px-1.5 py-1.5 sm:px-2 sm:py-2">
+        <div className="mx-auto flex w-full max-w-4xl items-center justify-around px-1.5 py-1.5 sm:px-2 sm:py-2">
           {BOARD_PLATFORMS.map((platform) => {
             const isActive = platform.id === activePlatformId;
             const Icon = platform.icon;
@@ -118,7 +118,7 @@ function MetaBrainBoardShell() {
 
                 {/* PLATFORM LABEL */}
                 <span
-                  className={`mt-1 text-[11px] tracking-tight transition-colors ${
+                  className={`mt-1 text-[10px] sm:text-[11px] tracking-tight whitespace-nowrap transition-colors ${
                     isActive ? "text-amber-400 font-semibold" : "text-muted-foreground"
                   }`}
                 >
