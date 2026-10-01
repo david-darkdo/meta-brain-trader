@@ -127,9 +127,9 @@ function TradeCreator() {
         session: parsed.data.session,
         day_of_week: parsed.data.day_of_week,
         notes: parsed.data.notes,
-        trade_status: mode === "run" ? "EXECUTED" : "PLANNED",
-        executed: mode === "run",
-        executed_at: mode === "run" ? new Date().toISOString() : null,
+        trade_status: "DRAFT",
+        executed: false,
+        executed_at: null,
       };
 
       const { data: tradeData, error: tradeError } = await supabase
@@ -190,16 +190,11 @@ function TradeCreator() {
       }
 
       if (mode === "run") {
-        // Snapshot eligible MetaFund participations at trade execution time
-        try {
-          await supabase.rpc("snapshot_trade_participations", {
-            p_trade_id: tradeId,
-          });
-        } catch (snapErr: any) {
-          console.warn("MetaFund trade participation snapshot warning:", snapErr?.message);
-        }
-
-        toast.success("Trade created and queued for AI Edge Validation.");
+        const { error: validationError } = await supabase.functions.invoke("orchestrate-pipeline", {
+          body: { trade_id: tradeId },
+        });
+        if (validationError) throw validationError;
+        toast.success("Trade created and queued for AI Edge Validation. Execution remains separate until you explicitly execute it.");
         navigate({ to: "/trade-detail/$id", params: { id: tradeId } });
       } else {
         toast.success("Trade plan saved successfully.");
