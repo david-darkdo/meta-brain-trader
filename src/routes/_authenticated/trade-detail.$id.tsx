@@ -249,15 +249,17 @@ function TradeDetail() {
     onError: (e) => toast.error(e instanceof Error ? e.message : "Failed"),
   });
 
-  const toggleExecuted = useMutation({
-    mutationFn: async (next: boolean) => {
-      const { error } = await supabase
-        .from("trades")
-        .update({ executed: next })
-        .eq("trade_id", id);
+  const executeTrade = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc("execute_trade", { p_trade_id: id });
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["trade", id] }),
+    onSuccess: () => {
+      toast.success("Trade executed. MetaFund participation was snapshotted at the execution boundary.");
+      qc.invalidateQueries({ queryKey: ["trade", id] });
+    },
+    onError: (e) => toast.error(e instanceof Error ? e.message : "Trade execution failed"),
   });
 
   const [editOpen, setEditOpen] = useState(false);
