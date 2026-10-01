@@ -183,6 +183,23 @@ export async function fetchCompanyFinancialSummary(): Promise<CompanySummary | n
   return data as CompanySummary | null;
 }
 
+export type AdminRegisteredUser = {
+  user_id: string;
+  email: string | null;
+  subscription_tier: string | null;
+  created_at: string;
+  investor_account_id: string | null;
+  investor_account_number: string | null;
+  investor_status: string | null;
+  investor_currency: string | null;
+};
+
+export async function fetchAdminRegisteredUsers(): Promise<AdminRegisteredUser[]> {
+  const { data, error } = await supabase.rpc("admin_list_registered_users");
+  if (error) throw error;
+  return (data ?? []) as AdminRegisteredUser[];
+}
+
 export async function fetchAllInvestors() {
   const { data, error } = await supabase
     .from("investor_accounts")
