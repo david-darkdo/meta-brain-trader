@@ -157,11 +157,13 @@ export async function submitInvestorDepositProof(params: { eventId: string; tran
 export async function requestInvestorWithdrawal(params: {
   accountId: string;
   amount: number;
+  payoutDetails: Record<string, unknown>;
   notes?: string;
 }) {
-  const { data, error } = await supabase.rpc("request_withdrawal", {
+  const { data, error } = await supabase.rpc("request_withdrawal_with_details", {
     p_account_id: params.accountId,
     p_amount: params.amount,
+    p_payout_details: params.payoutDetails,
     p_notes: params.notes ?? null,
   });
 
