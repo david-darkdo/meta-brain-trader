@@ -362,8 +362,7 @@ function CommandCenterDashboard() {
                         <SelectItem key={u.user_id} value={u.user_id}>
                           {u.email || u.user_id} ({u.subscription_tier})
                         </SelectItem>
-                      ))}
-                    </SelectContent>
+                      ))}\n                    </SelectContent>
                   </Select>
                 </div>
 
@@ -389,7 +388,7 @@ function CommandCenterDashboard() {
                         <SelectItem value="EUR">EUR (€)</SelectItem>
                         <SelectItem value="GBP">GBP (£)</SelectItem>
                       </SelectContent>
-                    </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </div>
@@ -464,7 +463,7 @@ function CommandCenterDashboard() {
                         <SelectItem value="GBP">GBP (£)</SelectItem>
                         <SelectItem value="NGN">NGN (₦)</SelectItem>
                       </SelectContent>
-                    </SelectContent>
+                    </Select>
                   </div>
                 </div>
 
