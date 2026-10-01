@@ -371,7 +371,7 @@ function InvestorMetaFundDashboard() {
                         {selectedPaymentAccount.instructions && <div className="pt-2 border-t border-border/60 text-xs text-muted-foreground whitespace-pre-wrap">{selectedPaymentAccount.instructions}</div>}
                       </div>
                     )}
-                    <div className="grid grid-cols-2 gap-3"><div className="space-y-1.5"><Label htmlFor="deposit-amount" className="text-xs">Amount Deposited</Label><Input id="deposit-amount" type="number" min="0.01" step="any" value={depositAmount} onChange={e=>setDepositAmount(e.target.value)} /></div><div className="space-y-1.5"><Label htmlFor="deposit-tx" className="text-xs">Transaction ID (Optional)</Label><Input id="deposit-tx" value={depositTransactionId} onChange={e=>setDepositTransactionId(e.target.value)} placeholder="Bank / transfer reference" /></div></div>
+                    <div className="space-y-1.5"><Label htmlFor="deposit-amount" className="text-xs">Amount Deposited</Label><Input id="deposit-amount" type="number" min="0.01" step="any" value={depositAmount} onChange={e=>setDepositAmount(e.target.value)} placeholder="Enter amount transferred" /></div>
                     <div className="rounded-lg border border-border/60 bg-background/30 p-3 text-xs text-muted-foreground">Complete the transfer using the verified receiving account above. When the transfer is complete, continue to upload your proof of payment. Your capital remains pending until the company verifies the deposit.</div>
                     {depositError && <p className="text-xs text-destructive">{depositError}</p>}
                   </>)}
