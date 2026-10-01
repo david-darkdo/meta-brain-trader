@@ -1390,7 +1390,23 @@ function CommandCenterDashboard() {
 
                 {paymentMethodType === "BANK" ? (
                   <>
-                    <div><Label className="text-xs">Currency</Label><Input value={paymentCurrency} onChange={e=>setPaymentCurrency(e.target.value.toUpperCase())} maxLength={3} placeholder="USD" /></div>
+                    <div>
+  <Label className="text-xs">Currency</Label>
+  <select
+    className="mt-1 w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm text-foreground"
+    value={paymentCurrency}
+    onChange={e=>setPaymentCurrency(e.target.value)}
+  >
+    <option value="USD">USD — US Dollar</option>
+    <option value="NGN">NGN — Nigerian Naira (₦)</option>
+    <option value="EUR">EUR — Euro</option>
+    <option value="GBP">GBP — British Pound</option>
+    <option value="CHF">CHF — Swiss Franc</option>
+    <option value="CAD">CAD — Canadian Dollar</option>
+    <option value="AUD">AUD — Australian Dollar</option>
+    <option value="AED">AED — UAE Dirham</option>
+  </select>
+</div>
                     <div><Label className="text-xs">Bank Name</Label><Input value={paymentBankName} onChange={e=>setPaymentBankName(e.target.value)} /></div>
                     <div><Label className="text-xs">Account Name</Label><Input value={paymentAccountName} onChange={e=>setPaymentAccountName(e.target.value)} /></div>
                     <div><Label className="text-xs">Account Number</Label><Input value={paymentAccountNumber} onChange={e=>setPaymentAccountNumber(e.target.value)} /></div>
