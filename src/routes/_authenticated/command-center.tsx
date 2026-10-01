@@ -147,6 +147,7 @@ function CommandCenterDashboard() {
   const capitalEventsQ = useQuery({
     queryKey: ["admin", "capital_events"],
     queryFn: fetchAllCapitalEvents,
+    refetchInterval: 15000,
   });
 
   // 4. Investment Cycles
