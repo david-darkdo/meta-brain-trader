@@ -114,6 +114,8 @@ function CommandCenterDashboard() {
   const [rejectReason, setRejectReason] = useState("");
 
   // State for Company Deposit Account
+  const [paymentEditingId, setPaymentEditingId] = useState<string | null>(null);
+  const [paymentMethodType, setPaymentMethodType] = useState<"BANK" | "CRYPTO">("BANK");
   const [paymentLabel, setPaymentLabel] = useState("");
   const [paymentCurrency, setPaymentCurrency] = useState("USD");
   const [paymentBankName, setPaymentBankName] = useState("");
@@ -121,6 +123,10 @@ function CommandCenterDashboard() {
   const [paymentAccountNumber, setPaymentAccountNumber] = useState("");
   const [paymentRoutingCode, setPaymentRoutingCode] = useState("");
   const [paymentSwiftCode, setPaymentSwiftCode] = useState("");
+  const [paymentAsset, setPaymentAsset] = useState("BTC");
+  const [paymentNetwork, setPaymentNetwork] = useState("BTC");
+  const [paymentWalletAddress, setPaymentWalletAddress] = useState("");
+  const [paymentMemoTag, setPaymentMemoTag] = useState("");
   const [paymentInstructions, setPaymentInstructions] = useState("");
 
   // 1. Company Financial Summary
@@ -211,19 +217,65 @@ function CommandCenterDashboard() {
     },
   });
 
+  const resetPaymentForm = () => {
+    setPaymentEditingId(null);
+    setPaymentMethodType("BANK");
+    setPaymentLabel("");
+    setPaymentCurrency("USD");
+    setPaymentBankName("");
+    setPaymentAccountName("");
+    setPaymentAccountNumber("");
+    setPaymentRoutingCode("");
+    setPaymentSwiftCode("");
+    setPaymentAsset("BTC");
+    setPaymentNetwork("BTC");
+    setPaymentWalletAddress("");
+    setPaymentMemoTag("");
+    setPaymentInstructions("");
+  };
+
+  const editPaymentAccount = (a: any) => {
+    setPaymentEditingId(a.id);
+    setPaymentMethodType(a.method_type === "CRYPTO" ? "CRYPTO" : "BANK");
+    setPaymentLabel(a.label || "");
+    setPaymentCurrency(a.currency || "USD");
+    setPaymentBankName(a.bank_name || "");
+    setPaymentAccountName(a.account_name || "");
+    setPaymentAccountNumber(a.account_number || "");
+    setPaymentRoutingCode(a.routing_code || "");
+    setPaymentSwiftCode(a.swift_code || "");
+    setPaymentAsset(a.asset || a.currency || "BTC");
+    setPaymentNetwork(a.network || "BTC");
+    setPaymentWalletAddress(a.wallet_address || "");
+    setPaymentMemoTag(a.memo_tag || "");
+    setPaymentInstructions(a.instructions || "");
+    setActiveTab("payment_accounts");
+  };
+
   const savePaymentAccountMutation = useMutation({
     mutationFn: async () => {
-      if (!paymentLabel.trim() || !paymentAccountName.trim() || !paymentAccountNumber.trim()) {
-        throw new Error("Label, account name and account number are required.");
+      if (!paymentLabel.trim()) throw new Error("Account label is required.");
+      if (paymentMethodType === "BANK" && (!paymentAccountName.trim() || !paymentAccountNumber.trim())) {
+        throw new Error("Bank account name and account number are required.");
       }
-      const { data, error } = await supabase.rpc("admin_upsert_company_payment_account", {
+      if (paymentMethodType === "CRYPTO" && (!paymentAsset.trim() || !paymentNetwork.trim() || !paymentWalletAddress.trim())) {
+        throw new Error("Crypto asset, network and wallet address are required.");
+      }
+
+      const { data, error } = await supabase.rpc("admin_save_company_payment_account", {
+        p_id: paymentEditingId,
         p_label: paymentLabel,
-        p_currency: paymentCurrency,
-        p_bank_name: paymentBankName || null,
-        p_account_name: paymentAccountName,
-        p_account_number: paymentAccountNumber,
-        p_routing_code: paymentRoutingCode || null,
-        p_swift_code: paymentSwiftCode || null,
+        p_method_type: paymentMethodType,
+        p_currency: paymentMethodType === "CRYPTO" ? paymentAsset.toUpperCase() : paymentCurrency.toUpperCase(),
+        p_bank_name: paymentMethodType === "BANK" ? paymentBankName || null : null,
+        p_account_name: paymentMethodType === "BANK" ? paymentAccountName : null,
+        p_account_number: paymentMethodType === "BANK" ? paymentAccountNumber : null,
+        p_routing_code: paymentMethodType === "BANK" ? paymentRoutingCode || null : null,
+        p_swift_code: paymentMethodType === "BANK" ? paymentSwiftCode || null : null,
+        p_asset: paymentMethodType === "CRYPTO" ? paymentAsset.toUpperCase() : null,
+        p_network: paymentMethodType === "CRYPTO" ? paymentNetwork : null,
+        p_wallet_address: paymentMethodType === "CRYPTO" ? paymentWalletAddress : null,
+        p_memo_tag: paymentMethodType === "CRYPTO" ? paymentMemoTag || null : null,
         p_instructions: paymentInstructions || null,
         p_is_active: true,
         p_display_order: 0,
@@ -232,12 +284,24 @@ function CommandCenterDashboard() {
       return data;
     },
     onSuccess: () => {
-      toast.success("Company deposit account published.");
-      setPaymentLabel(""); setPaymentBankName(""); setPaymentAccountName(""); setPaymentAccountNumber("");
-      setPaymentRoutingCode(""); setPaymentSwiftCode(""); setPaymentInstructions("");
+      toast.success(paymentEditingId ? "Deposit account updated." : "Deposit account published.");
+      resetPaymentForm();
       qc.invalidateQueries({ queryKey: ["admin", "payment_accounts"] });
     },
-    onError: (err: any) => toast.error(err?.message || "Failed to publish company deposit account."),
+    onError: (err: any) => toast.error(err?.message || "Failed to save deposit account."),
+  });
+
+  const deactivatePaymentAccountMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.rpc("admin_deactivate_company_payment_account", { p_id: id });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Deposit account removed from investor deposit options.");
+      if (paymentEditingId) resetPaymentForm();
+      qc.invalidateQueries({ queryKey: ["admin", "payment_accounts"] });
+    },
+    onError: (err: any) => toast.error(err?.message || "Failed to remove deposit account."),
   });
 
   // 9. Audit Logs
@@ -1220,27 +1284,75 @@ function CommandCenterDashboard() {
           <Card className="bg-card/60 border-border/70">
             <CardHeader>
               <CardTitle className="text-sm font-bold">Company Deposit Accounts</CardTitle>
-              <CardDescription className="text-xs">These are the verified company accounts shown to investors before they make a deposit. Publishing an account does not create investor capital.</CardDescription>
+              <CardDescription className="text-xs">Create and manage every receiving channel investors may use. Bank accounts and crypto addresses are stored as payment destinations only; publishing one never creates investor capital.</CardDescription>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div><Label className="text-xs">Label</Label><Input value={paymentLabel} onChange={e=>setPaymentLabel(e.target.value)} placeholder="e.g. Company USD Bank Account" /></div>
-                <div><Label className="text-xs">Currency</Label><Input value={paymentCurrency} onChange={e=>setPaymentCurrency(e.target.value.toUpperCase())} maxLength={3} /></div>
-                <div><Label className="text-xs">Bank Name</Label><Input value={paymentBankName} onChange={e=>setPaymentBankName(e.target.value)} /></div>
-                <div><Label className="text-xs">Account Name</Label><Input value={paymentAccountName} onChange={e=>setPaymentAccountName(e.target.value)} /></div>
-                <div><Label className="text-xs">Account Number</Label><Input value={paymentAccountNumber} onChange={e=>setPaymentAccountNumber(e.target.value)} /></div>
-                <div><Label className="text-xs">Routing / Sort Code</Label><Input value={paymentRoutingCode} onChange={e=>setPaymentRoutingCode(e.target.value)} /></div>
-                <div><Label className="text-xs">SWIFT</Label><Input value={paymentSwiftCode} onChange={e=>setPaymentSwiftCode(e.target.value)} /></div>
-                <div className="sm:col-span-2"><Label className="text-xs">Investor Instructions</Label><Input value={paymentInstructions} onChange={e=>setPaymentInstructions(e.target.value)} placeholder="Reference format, transfer instructions, etc." /></div>
+            <CardContent className="space-y-5">
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-muted-foreground">
+                <span className="font-semibold text-amber-400">Receiving channels:</span> add as many bank accounts, BTC addresses, USDT addresses, or other supported crypto networks as the company needs. Removing an account deactivates it for new deposits while preserving historical references.
               </div>
-              <Button className="gold-gradient-btn" onClick={()=>savePaymentAccountMutation.mutate()} disabled={savePaymentAccountMutation.isPending}>
-                {savePaymentAccountMutation.isPending ? "Publishing..." : "Publish Deposit Account"}
-              </Button>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Account Type</Label>
+                  <select className="mt-1 w-full rounded-md border border-border bg-secondary/50 px-3 py-2 text-sm" value={paymentMethodType} onChange={e=>setPaymentMethodType(e.target.value as "BANK"|"CRYPTO")}>
+                    <option value="BANK">Bank / Normal Deposit Account</option>
+                    <option value="CRYPTO">Crypto / Wallet Address</option>
+                  </select>
+                </div>
+                <div><Label className="text-xs">Label</Label><Input value={paymentLabel} onChange={e=>setPaymentLabel(e.target.value)} placeholder={paymentMethodType === "CRYPTO" ? "e.g. USDT TRC20 Main Wallet" : "e.g. Company USD Bank Account"} /></div>
+
+                {paymentMethodType === "BANK" ? (
+                  <>
+                    <div><Label className="text-xs">Currency</Label><Input value={paymentCurrency} onChange={e=>setPaymentCurrency(e.target.value.toUpperCase())} maxLength={3} placeholder="USD" /></div>
+                    <div><Label className="text-xs">Bank Name</Label><Input value={paymentBankName} onChange={e=>setPaymentBankName(e.target.value)} /></div>
+                    <div><Label className="text-xs">Account Name</Label><Input value={paymentAccountName} onChange={e=>setPaymentAccountName(e.target.value)} /></div>
+                    <div><Label className="text-xs">Account Number</Label><Input value={paymentAccountNumber} onChange={e=>setPaymentAccountNumber(e.target.value)} /></div>
+                    <div><Label className="text-xs">Routing / Sort Code</Label><Input value={paymentRoutingCode} onChange={e=>setPaymentRoutingCode(e.target.value)} /></div>
+                    <div><Label className="text-xs">SWIFT</Label><Input value={paymentSwiftCode} onChange={e=>setPaymentSwiftCode(e.target.value)} /></div>
+                  </>
+                ) : (
+                  <>
+                    <div><Label className="text-xs">Crypto Asset</Label><Input value={paymentAsset} onChange={e=>setPaymentAsset(e.target.value.toUpperCase())} placeholder="BTC or USDT" /></div>
+                    <div><Label className="text-xs">Network</Label><Input value={paymentNetwork} onChange={e=>setPaymentNetwork(e.target.value)} placeholder="BTC, TRC20, ERC20, BEP20..." /></div>
+                    <div className="sm:col-span-2"><Label className="text-xs">Wallet Address</Label><Input value={paymentWalletAddress} onChange={e=>setPaymentWalletAddress(e.target.value)} placeholder="Paste the exact receiving wallet address" className="font-mono" /></div>
+                    <div><Label className="text-xs">Memo / Tag (Optional)</Label><Input value={paymentMemoTag} onChange={e=>setPaymentMemoTag(e.target.value)} /></div>
+                  </>
+                )}
+
+                <div className="sm:col-span-2"><Label className="text-xs">Investor Instructions</Label><Input value={paymentInstructions} onChange={e=>setPaymentInstructions(e.target.value)} placeholder="Reference format, network warning, transfer instructions, etc." /></div>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                <Button className="gold-gradient-btn" onClick={()=>savePaymentAccountMutation.mutate()} disabled={savePaymentAccountMutation.isPending}>
+                  {savePaymentAccountMutation.isPending ? "Saving..." : paymentEditingId ? "Save Changes" : "Add Deposit Account"}
+                </Button>
+                {paymentEditingId && <Button variant="outline" onClick={resetPaymentForm}>Cancel Edit</Button>}
+              </div>
+
               <div className="space-y-2">
-                {(paymentAccountsQ.data ?? []).map((a:any)=>(
-                  <div key={a.id} className="flex items-center justify-between rounded-lg border border-border/70 p-3 bg-secondary/20">
-                    <div><div className="text-sm font-semibold">{a.label}</div><div className="text-xs text-muted-foreground">{a.currency} · {a.bank_name || "Bank"} · {a.account_number || "No account number"}</div></div>
-                    <Badge variant={a.is_active ? "default" : "outline"}>{a.is_active ? "ACTIVE" : "INACTIVE"}</Badge>
+                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Configured Receiving Channels</div>
+                {(paymentAccountsQ.data ?? []).length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border p-6 text-center text-xs text-muted-foreground">No receiving accounts configured yet.</div>
+                ) : (paymentAccountsQ.data ?? []).map((a:any)=>(
+                  <div key={a.id} className="rounded-xl border border-border/70 p-3 bg-secondary/20">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="text-sm font-semibold">{a.label}</div>
+                          <Badge variant={a.is_active ? "default" : "outline"}>{a.is_active ? "ACTIVE" : "INACTIVE"}</Badge>
+                          <Badge variant="outline" className="text-[10px]">{a.method_type === "CRYPTO" ? `${a.asset || a.currency} · ${a.network || "NETWORK"}` : a.currency}</Badge>
+                        </div>
+                        {a.method_type === "CRYPTO" ? (
+                          <div className="mt-1 text-xs text-muted-foreground font-mono break-all">{a.wallet_address}</div>
+                        ) : (
+                          <div className="mt-1 text-xs text-muted-foreground">{a.bank_name || "Bank"} · {a.account_name || "Account"} · {a.account_number || "No account number"}</div>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 gap-2">
+                        <Button size="sm" variant="outline" className="h-8" onClick={()=>editPaymentAccount(a)}>Edit</Button>
+                        {a.is_active && <Button size="sm" variant="outline" className="h-8 text-destructive border-destructive/30 hover:text-destructive" onClick={()=>deactivatePaymentAccountMutation.mutate(a.id)} disabled={deactivatePaymentAccountMutation.isPending}>Remove</Button>}
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
