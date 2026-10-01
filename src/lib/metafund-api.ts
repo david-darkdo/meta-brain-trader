@@ -142,8 +142,8 @@ export async function fetchCompanyPaymentAccounts(): Promise<CompanyPaymentAccou
   return (data ?? []) as CompanyPaymentAccount[];
 }
 
-export async function createInvestorDepositIntent(params: { accountId: string; amount: number; currency: string; paymentAccountId: string }) {
-  const { data, error } = await supabase.rpc("create_deposit_intent", { p_account_id: params.accountId, p_amount: params.amount, p_currency: params.currency, p_payment_account_id: params.paymentAccountId });
+export async function createInvestorDepositIntent(params: { accountId?: string | null; amount: number; currency: string; paymentAccountId: string }) {
+  const { data, error } = await supabase.rpc("create_deposit_intent", { p_account_id: params.accountId ?? null, p_amount: params.amount, p_currency: params.currency, p_payment_account_id: params.paymentAccountId });
   if (error) throw error;
   return data as { status: string; event_id: string; event_status: string };
 }
