@@ -412,17 +412,15 @@ function TradeDetail() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2 rounded-md border border-border bg-card px-3 py-1.5">
-            <Label htmlFor="executed" className="text-xs font-semibold">
-              Executed
-            </Label>
-            <Switch
-              id="executed"
-              checked={t.executed}
-              onCheckedChange={(v) => toggleExecuted.mutate(v)}
-            />
-          </div>
-          {tab === "post" ? (
+          {!t.executed && (
+            <Button
+              size="sm"
+              onClick={() => executeTrade.mutate()}
+              disabled={executeTrade.isPending || t.trade_status !== "PRE_ANALYZED" || t.processing_step !== "COMPLETED"}
+            >
+              {executeTrade.isPending ? "Executing…" : "Execute Trade"}
+            </Button>
+          )}       {tab === "post" ? (
             <Button
               size="sm"
               variant="outline"
