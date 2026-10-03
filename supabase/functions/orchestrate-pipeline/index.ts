@@ -60,11 +60,22 @@ async function runPipeline(tradeId: string) {
     .eq("user_id", trade.user_id)
     .maybeSingle();
 
-  // Screenshots
-  const { data: shots } = await admin
+  // Pre-trade validation consumes only persistent PRE screenshots
+  // attached to this trade. POST screenshots are separate evidence.
+  const { data: shots, error: shotsError } = await admin
     .from("screenshots")
     .select("url")
-    .eq("trade_id", tradeId);
+    .eq("trade_id", tradeId)
+    .eq("analysis_phase", "PRE")
+    .order("created_at", { ascending: true });
+
+  if (shotsError) {
+    throw new Error(`Failed to load pre-trade screenshots: ${shotsError.message}`);
+  }
+  if (!shots || shots.length === 0) {
+    throw new Error("No pre-trade screenshots are attached to this trade. Validation cannot run without the chart evidence.");
+  }
+
   const signed = (
     await Promise.all((shots ?? []).map((s) => signScreenshot(s.url)))
   ).filter((u): u is string => !!u);
