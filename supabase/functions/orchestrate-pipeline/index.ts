@@ -76,9 +76,10 @@ async function runPipeline(tradeId: string) {
     throw new Error("No pre-trade screenshots are attached to this trade. Validation cannot run without the chart evidence.");
   }
 
-  const signed = (
-    await Promise.all((shots ?? []).map((s) => signScreenshot(s.url)))
-  ).filter((u): u is string => !!u);
+  const signed = await Promise.all((shots ?? []).map((s) => signScreenshot(s.url)));
+  if (signed.some((u) => !u) || signed.length !== shots.length) {
+    throw new Error("One or more pre-trade chart screenshots could not be loaded from secure storage. Validation was stopped before AI analysis.");
+  }
 
   // Recent 24 trades for learning context
   const { data: recent } = await admin
