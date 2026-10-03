@@ -114,6 +114,12 @@ function TradeCreator() {
         return;
       }
 
+      // AI validation is a chart-evidence pipeline. Do not create a run that
+      // cannot supply the required chart screenshots.
+      if (mode === "run" && uploads.length === 0) {
+        throw new Error("Attach at least one chart screenshot before using Save & Run.");
+      }
+
       // 2. Insert Base Trade Record
       const tradePayload: any = {
         user_id: user.id,
