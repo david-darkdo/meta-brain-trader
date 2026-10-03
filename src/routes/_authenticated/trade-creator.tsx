@@ -82,6 +82,8 @@ function TradeCreator() {
   };
 
   const handleCreateTrade = async (mode: "save" | "run") => {
+    let createdTradeId: string | null = null;
+    const uploadedStoragePaths: string[] = [];
     try {
       setIsSubmitting(true);
       const {
@@ -149,6 +151,7 @@ function TradeCreator() {
       }
 
       const tradeId = tradeData.trade_id;
+      createdTradeId = tradeId;
 
       // 3. Upload Attached Screenshots if any
       if (uploads.length > 0) {
@@ -163,6 +166,8 @@ function TradeCreator() {
           if (storageError) {
             throw new Error(`Failed to upload chart screenshot "${u.file.name}": ${storageError.message}`);
           }
+
+          uploadedStoragePaths.push(fileName);
 
           const {
             data: { publicUrl },
@@ -206,6 +211,23 @@ function TradeCreator() {
         navigate({ to: "/validator" });
       }
     } catch (err: any) {
+      // Storage and database writes are separate systems. Remove uploaded
+      // files when metadata/pipeline setup fails so a failed run cannot leave
+      // orphaned chart evidence or a trade falsely stuck in validation.
+      if (uploadedStoragePaths.length > 0) {
+        await supabase.storage.from("trade-screenshots").remove(uploadedStoragePaths).catch(() => undefined);
+      }
+      if (createdTradeId && user?.id) {
+        await supabase
+          .from("trades")
+          .update({
+            trade_status: "DRAFT",
+            processing_step: null,
+            processing_error: err?.message || "Chart evidence could not be persisted.",
+          })
+          .eq("trade_id", createdTradeId)
+          .eq("user_id", user.id);
+      }
       toast.error(err?.message || "An unexpected error occurred.");
     } finally {
       setIsSubmitting(false);
