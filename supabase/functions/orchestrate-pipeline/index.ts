@@ -206,6 +206,48 @@ Deno.serve(async (req) => {
     const { trade_id } = await req.json();
     if (!trade_id) throw new Error("trade_id required");
 
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(JSON.stringify({ error: "Authentication required." }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+    const accessToken = authHeader.slice("Bearer ".length);
+    const { data: authData, error: authError } = await admin.auth.getUser(accessToken);
+    if (authError || !authData.user) {
+      return new Response(JSON.stringify({ error: "Invalid authentication token." }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: targetTrade, error: targetTradeError } = await admin
+      .from("trades")
+      .select("user_id")
+      .eq("trade_id", trade_id)
+      .single();
+    if (targetTradeError || !targetTrade) {
+      return new Response(JSON.stringify({ error: "Trade not found." }), {
+        status: 404,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: roleRow } = await admin
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", authData.user.id)
+      .eq("role", "ADMIN")
+      .maybeSingle();
+    const isOwner = targetTrade.user_id === authData.user.id;
+    if (!isOwner && !roleRow) {
+      return new Response(JSON.stringify({ error: "Access denied for this trade." }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     // Mark as PRE_ANALYSIS immediately so UI flips
     await admin
       .from("trades")
@@ -215,7 +257,21 @@ Deno.serve(async (req) => {
     // Run in background so we can return immediately for realtime UX
     // @ts-ignore - EdgeRuntime available in Supabase functions
     EdgeRuntime.waitUntil(
-      runPipeline(trade_id).catch((e) => console.error("pipeline error", e)),
+      runPipeline(trade_id).catch(async (e) => {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error("pipeline error", msg);
+        await admin
+          .from("trades")
+          .update({ processing_step: "FAILED", processing_error: msg })
+          .eq("trade_id", trade_id);
+        await admin.from("job_queue").insert({
+          trade_id,
+          stage: "PRETRADE_PREFLIGHT",
+          status: "FAILED",
+          last_error: msg,
+          attempts: 1,
+        });
+      }),
     );
 
     return new Response(JSON.stringify({ status: "started" }), {
