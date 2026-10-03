@@ -379,9 +379,14 @@ function TradeDetail() {
 
       const signed = await Promise.all(
         (data ?? []).map(async (s) => {
+          // The database stores the canonical storage object path.
+          // Keep a compatibility fallback for historical full public URLs.
+          const storagePath = s.url.startsWith("http")
+            ? s.url.split("/storage/v1/object/public/trade-screenshots/")[1] ?? s.url
+            : s.url;
           const { data: sig, error: sigError } = await supabase.storage
             .from("trade-screenshots")
-            .createSignedUrl(s.url, 60 * 60);
+            .createSignedUrl(storagePath, 60 * 60);
           return {
             ...s,
             signedUrl: sig?.signedUrl ?? null,
