@@ -22,6 +22,26 @@ async function signScreenshot(path: string) {
   return data?.signedUrl ?? null;
 }
 
+
+async function assertChartEvidence(tradeId: string) {
+  const { data: shots, error } = await admin
+    .from("screenshots")
+    .select("url")
+    .eq("trade_id", tradeId)
+    .eq("analysis_phase", "PRE")
+    .order("created_at", { ascending: true });
+
+  if (error) throw new Error(`Failed to load pre-trade screenshots: ${error.message}`);
+  if (!shots || shots.length === 0) {
+    throw new Error("No pre-trade screenshots are attached to this trade. Validation cannot run without the chart evidence.");
+  }
+
+  const signed = await Promise.all(shots.map((s) => signScreenshot(s.url)));
+  if (signed.some((u) => !u) || signed.length !== shots.length) {
+    throw new Error("One or more pre-trade chart screenshots could not be loaded from secure storage. Validation was stopped before AI analysis.");
+  }
+}
+
 async function runPipeline(tradeId: string) {
   // Load trade
   const { data: trade, error: tErr } = await admin
@@ -248,7 +268,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Mark as PRE_ANALYSIS immediately so UI flips
+    // Perform chart-evidence preflight before changing trade state. A trade
+    // must never enter PRE_ANALYSIS unless its persistent chart evidence is
+    // present and readable. This keeps failed runs visible as actionable
+    // errors instead of leaving the UI in a false "AI pipeline running" state.
+    try {
+      await assertChartEvidence(trade_id);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      return new Response(JSON.stringify({ error: msg }), {
+        status: 422,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Only after preflight succeeds do we mark the run as active.
     await admin
       .from("trades")
       .update({ trade_status: "PRE_ANALYSIS", processing_step: "PENDING", processing_error: null })
