@@ -273,7 +273,10 @@ function InvestorMetaFundDashboard() {
   // Financial Values (Safe fallback to 0.00 for State A and State B)
   const equity = Number(s?.current_economic_equity ?? 0);
   const available = Number(s?.available_capital ?? 0);
+  // Invested means capital currently occupied by executed open trades.
+  // Deposits belong to economic equity/capital flow, not invested capital.
   const committed = Number(s?.active_committed_capital ?? 0);
+  const invested = committed;
   const pnl = Number(s?.realized_trading_pnl ?? 0);
   const deposited = Number(s?.cumulative_deposited ?? 0);
   const withdrawn = Number(s?.cumulative_withdrawn ?? 0);
@@ -634,7 +637,7 @@ function InvestorMetaFundDashboard() {
             <div>
               <div className="text-xs text-muted-foreground">Invested</div>
               <div className="text-sm sm:text-base font-bold text-foreground font-mono mt-0.5">
-                ${deposited.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+                ${invested.toLocaleString("en-US", { minimumFractionDigits: 2 })}
               </div>
             </div>
 
