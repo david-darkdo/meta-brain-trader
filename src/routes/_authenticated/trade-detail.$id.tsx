@@ -176,6 +176,7 @@ function TradeDetail() {
         () => {
           qc.invalidateQueries({ queryKey: ["trade", id] });
           qc.invalidateQueries({ queryKey: ["trade", id, "analyses"] });
+          qc.invalidateQueries({ queryKey: ["trade", id, "pre-screenshots"] });
         },
       )
       .subscribe();
@@ -192,14 +193,39 @@ function TradeDetail() {
       )
       .subscribe();
 
+    const chScreenshots = supabase
+      .channel(`trade-${id}-screenshots-realtime`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "screenshots", filter: `trade_id=eq.${id}` },
+        () => {
+          qc.invalidateQueries({ queryKey: ["trade", id, "pre-screenshots"] });
+        },
+      )
+      .subscribe();
+
     return () => {
       supabase.removeChannel(ch);
       supabase.removeChannel(chAnalyses);
+      supabase.removeChannel(chScreenshots);
     };
   }, [id, qc]);
 
   const runFn = async (fn: "orchestrate-pipeline" | "post-trade-pipeline") => {
     const { data: { session } } = await supabase.auth.getSession();
+    if (fn === "orchestrate-pipeline") {
+      // Re-validation must use the trade's existing pre-trade screenshots.
+      // They are persistent trade evidence, not disposable pipeline input.
+      const { data: preShots, error: preShotError } = await supabase
+        .from("screenshots")
+        .select("screenshot_id")
+        .eq("trade_id", id)
+        .eq("analysis_phase", "PRE");
+      if (preShotError) throw preShotError;
+      if (!preShots || preShots.length === 0) {
+        throw new Error("This trade has no pre-trade screenshots attached. Upload the chart screenshots before re-running validation.");
+      }
+    }
     const rawUrl = import.meta.env.VITE_SUPABASE_URL || "https://jqptprskuxkhfoxsvwcl.supabase.co";
     const supabaseUrl = rawUrl.includes("qlfauxgzlooqebtpmcte") ? "https://jqptprskuxkhfoxsvwcl.supabase.co" : rawUrl;
     const apikey = (import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxcHRwcnNrdXhraGZveHN2d2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMzQzOTAsImV4cCI6MjEwMTcxMDM5MH0.uSSUrrH3xWSoqcOcc88LBePB5SGNL_fARHZzAj94cvM") as string;
@@ -313,9 +339,12 @@ function TradeDetail() {
     },
     onSuccess: (rerunAi) => {
       qc.invalidateQueries({ queryKey: ["trade", id] });
+      qc.invalidateQueries({ queryKey: ["trade", id, "pre-screenshots"] });
       setEditOpen(false);
       toast.success("Trade plan updated successfully");
       if (rerunAi) {
+        // Preserve and explicitly re-use the same trade-attached screenshots.
+        // runFn verifies they still exist before the validator starts.
         startPre.mutate();
       }
     },
@@ -347,12 +376,17 @@ function TradeDetail() {
         .eq("analysis_phase", "PRE")
         .order("is_primary", { ascending: false });
       if (error) throw error;
+
       const signed = await Promise.all(
         (data ?? []).map(async (s) => {
-          const { data: sig } = await supabase.storage
+          const { data: sig, error: sigError } = await supabase.storage
             .from("trade-screenshots")
             .createSignedUrl(s.url, 60 * 60);
-          return { ...s, signedUrl: sig?.signedUrl ?? null };
+          return {
+            ...s,
+            signedUrl: sig?.signedUrl ?? null,
+            signedUrlError: sigError?.message ?? null,
+          };
         }),
       );
       return signed;
@@ -696,6 +730,13 @@ function TradeDetail() {
             <CardContent>
               {shotsQ.isLoading ? (
                 <p className="text-sm text-muted-foreground">Loading screenshots…</p>
+              ) : shotsQ.error ? (
+                <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+                  <p className="font-medium text-destructive">Unable to load pre-trade screenshots.</p>
+                  <p className="mt-1 text-muted-foreground">
+                    The screenshots remain attached to this trade; the viewer encountered an access/loading error.
+                  </p>
+                </div>
               ) : !shotsQ.data || shotsQ.data.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No pre-trade screenshots uploaded.</p>
               ) : (
@@ -714,8 +755,9 @@ function TradeDetail() {
                           />
                         </a>
                       ) : (
-                        <div className="flex h-48 items-center justify-center text-xs text-muted-foreground">
-                          Image unavailable
+                        <div className="flex h-48 flex-col items-center justify-center gap-1 px-3 text-center text-xs text-muted-foreground">
+                          <span>Screenshot record found, but the image could not be loaded.</span>
+                          {s.signedUrlError && <span className="text-[10px] opacity-70">{s.signedUrlError}</span>}
                         </div>
                       )}
                       <div className="p-3 text-xs">
