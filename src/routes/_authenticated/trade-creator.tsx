@@ -149,14 +149,13 @@ function TradeCreator() {
         setIsUploading(true);
         const uploadPromises = uploads.map(async (u) => {
           const fileExt = u.file.name.split(".").pop();
-          const fileName = `${tradeId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const fileName = `${user.id}/${tradeId}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
           const { error: storageError } = await supabase.storage
             .from("trade-screenshots")
             .upload(fileName, u.file);
 
           if (storageError) {
-            console.warn(`Failed to upload ${u.file.name}:`, storageError.message);
-            return null;
+            throw new Error(`Failed to upload chart screenshot "${u.file.name}": ${storageError.message}`);
           }
 
           const {
@@ -185,7 +184,7 @@ function TradeCreator() {
               analysis_phase: "PRE" as const,
             })),
           );
-          if (sErr) console.warn("Screenshots DB insert warning:", sErr.message);
+          if (sErr) throw new Error(`Failed to save chart screenshot metadata: ${sErr.message}`);
         }
       }
 
@@ -531,7 +530,7 @@ function TradeCreator() {
                     className="gold-gradient-btn text-xs font-semibold px-4 shadow-[0_2px_12px_rgba(245,158,11,0.2)]"
                   >
                     <Sparkles className="h-3.5 w-3.5 mr-1.5" />
-                    {isSubmitting ? "Validating Setup..." : "Save & Run AI Validation"}
+                    {isSubmitting ? "Saving & Running..." : "Save & Run"}
                   </Button>
                 </>
               )}
