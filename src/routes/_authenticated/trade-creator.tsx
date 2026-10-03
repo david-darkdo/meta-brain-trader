@@ -35,7 +35,7 @@ interface UploadedFile {
   previewUrl: string;
   label: string;
   is_primary: boolean;
-  shot_type: "FULL_LAYOUT" | "CHART_ONLY" | "INDICATOR_FOCUS" | "MULTI_TIMEFRAME";
+  shot_type: "ENTRY" | "MANAGEMENT" | "EXIT" | "RESULT" | "ACCOUNT" | "CONTEXT";
 }
 
 function TradeCreator() {
@@ -66,7 +66,7 @@ function TradeCreator() {
       previewUrl: URL.createObjectURL(file),
       label: file.name,
       is_primary: uploads.length === 0 && idx === 0,
-      shot_type: "FULL_LAYOUT",
+      shot_type: "ENTRY",
     }));
     setUploads((prev) => [...prev, ...newUploads]);
   };
@@ -164,7 +164,7 @@ function TradeCreator() {
           } = supabase.storage.from("trade-screenshots").getPublicUrl(fileName);
 
           return {
-            path: publicUrl,
+            path: fileName,
             label: u.label,
             is_primary: u.is_primary,
             shot_type: u.shot_type,
