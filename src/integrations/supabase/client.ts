@@ -27,19 +27,19 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 
-const TARGET_SUPABASE_URL = "https://jqptprskuxkhfoxsvwcl.supabase.co";
-const TARGET_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxcHRwcnNrdXhraGZveHN2d2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMzQzOTAsImV4cCI6MjEwMTcxMDM5MH0.uSSUrrH3xWSoqcOcc88LBePB5SGNL_fARHZzAj94cvM";
-
 function createSupabaseClient() {
-  // Use import.meta.env for client-side (Vite build-time replacement)
-  // Fall back to process.env for SSR (server-side rendering) or target constants
-  let SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || TARGET_SUPABASE_URL;
-  let SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || TARGET_SUPABASE_KEY;
+  // Each deployment must use the Supabase project configured for that environment.
+  // Vercel production and Lovable can therefore point at different Supabase
+  // projects without sharing application data.
+  const SUPABASE_URL =
+    import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
+  const SUPABASE_PUBLISHABLE_KEY =
+    import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
 
-  // Ensure legacy or empty source project URLs are normalized to target backend
-  if (SUPABASE_URL.includes("qlfauxgzlooqebtpmcte") || !SUPABASE_URL) {
-    SUPABASE_URL = TARGET_SUPABASE_URL;
-    SUPABASE_PUBLISHABLE_KEY = TARGET_SUPABASE_KEY;
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+    throw new Error(
+      "Supabase configuration is missing. Set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY for this deployment.",
+    );
   }
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
