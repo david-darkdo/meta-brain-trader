@@ -37,14 +37,20 @@ export async function callAI<T = unknown>(
   let model = opts.model ?? DEFAULTS.model;
   let provider = opts.provider ?? DEFAULTS.provider;
 
-  if (openaiKey) {
+  // MetaBrain's production validation path uses Lovable AI Gateway first.
+  // This keeps the validator independent of the developer's OpenAI billing
+  // account while the project is being completed. OpenAI remains an explicit
+  // fallback only when Lovable is not configured.
+  if (lovableKey) {
+    targetUrl = GATEWAY_URL;
+    headers["Lovable-API-Key"] = lovableKey;
+    provider = "google";
+    model = opts.model ?? DEFAULTS.model;
+  } else if (openaiKey) {
     targetUrl = "https://api.openai.com/v1/chat/completions";
     headers["Authorization"] = `Bearer ${openaiKey}`;
     model = "gpt-4o-mini";
     provider = "openai";
-  } else if (lovableKey) {
-    targetUrl = GATEWAY_URL;
-    headers["Lovable-API-Key"] = lovableKey;
   } else {
     throw new Error("Missing LOVABLE_API_KEY or OPENAI_API_KEY in environment");
   }
