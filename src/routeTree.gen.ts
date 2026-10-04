@@ -9,24 +9,29 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ResetPasswordRouteImport } from './routes/reset-password'
-import { Route as AuthRouteImport } from './routes/auth'
-import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as AuthenticatedValidatorRouteImport } from './routes/_authenticated/validator'
-import { Route as AuthenticatedCommunityRouteImport } from './routes/_authenticated/community'
-import { Route as AuthenticatedTradeCreatorRouteImport } from './routes/_authenticated/trade-creator'
-import { Route as AuthenticatedStrategyProfilesRouteImport } from './routes/_authenticated/strategy-profiles'
-import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
-import { Route as AuthenticatedMetafundRouteImport } from './routes/_authenticated/metafund'
-import { Route as AuthenticatedJournalRouteImport } from './routes/_authenticated/journal'
-import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as AuthenticatedCommandCenterRouteImport } from './routes/_authenticated/command-center'
+import { Route as AuthenticatedCommunityRouteImport } from './routes/_authenticated/community'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedJournalRouteImport } from './routes/_authenticated/journal'
+import { Route as AuthenticatedMetafundRouteImport } from './routes/_authenticated/metafund'
+import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedStrategyProfilesRouteImport } from './routes/_authenticated/strategy-profiles'
+import { Route as AuthenticatedTradeAnalysisRouteImport } from './routes/_authenticated/trade-analysis'
+import { Route as AuthenticatedTradeCreatorRouteImport } from './routes/_authenticated/trade-creator'
+import { Route as AuthenticatedValidatorRouteImport } from './routes/_authenticated/validator'
 import { Route as AuthenticatedTradeDetailIdRouteImport } from './routes/_authenticated/trade-detail.$id'
 
-const ResetPasswordRoute = ResetPasswordRouteImport.update({
-  id: '/reset-password',
-  path: '/reset-password',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthRoute = AuthRouteImport.update({
@@ -34,56 +39,10 @@ const AuthRoute = AuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
-  id: '/_authenticated',
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
   getParentRoute: () => rootRouteImport,
-} as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const AuthenticatedValidatorRoute = AuthenticatedValidatorRouteImport.update({
-  id: '/validator',
-  path: '/validator',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedCommunityRoute = AuthenticatedCommunityRouteImport.update({
-  id: '/community',
-  path: '/community',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedTradeCreatorRoute =
-  AuthenticatedTradeCreatorRouteImport.update({
-    id: '/trade-creator',
-    path: '/trade-creator',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedStrategyProfilesRoute =
-  AuthenticatedStrategyProfilesRouteImport.update({
-    id: '/strategy-profiles',
-    path: '/strategy-profiles',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
-const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedMetafundRoute = AuthenticatedMetafundRouteImport.update({
-  id: '/metafund',
-  path: '/metafund',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedJournalRoute = AuthenticatedJournalRouteImport.update({
-  id: '/journal',
-  path: '/journal',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
-  id: '/dashboard',
-  path: '/dashboard',
-  getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedCommandCenterRoute =
   AuthenticatedCommandCenterRouteImport.update({
@@ -91,6 +50,54 @@ const AuthenticatedCommandCenterRoute =
     path: '/command-center',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedCommunityRoute = AuthenticatedCommunityRouteImport.update({
+  id: '/community',
+  path: '/community',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedJournalRoute = AuthenticatedJournalRouteImport.update({
+  id: '/journal',
+  path: '/journal',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedMetafundRoute = AuthenticatedMetafundRouteImport.update({
+  id: '/metafund',
+  path: '/metafund',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedStrategyProfilesRoute =
+  AuthenticatedStrategyProfilesRouteImport.update({
+    id: '/strategy-profiles',
+    path: '/strategy-profiles',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedTradeAnalysisRoute =
+  AuthenticatedTradeAnalysisRouteImport.update({
+    id: '/trade-analysis',
+    path: '/trade-analysis',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedTradeCreatorRoute =
+  AuthenticatedTradeCreatorRouteImport.update({
+    id: '/trade-creator',
+    path: '/trade-creator',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedValidatorRoute = AuthenticatedValidatorRouteImport.update({
+  id: '/validator',
+  path: '/validator',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedTradeDetailIdRoute =
   AuthenticatedTradeDetailIdRouteImport.update({
     id: '/trade-detail/$id',
@@ -103,14 +110,15 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/command-center': typeof AuthenticatedCommandCenterRoute
+  '/community': typeof AuthenticatedCommunityRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/journal': typeof AuthenticatedJournalRoute
   '/metafund': typeof AuthenticatedMetafundRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/strategy-profiles': typeof AuthenticatedStrategyProfilesRoute
+  '/trade-analysis': typeof AuthenticatedTradeAnalysisRoute
   '/trade-creator': typeof AuthenticatedTradeCreatorRoute
   '/validator': typeof AuthenticatedValidatorRoute
-  '/community': typeof AuthenticatedCommunityRoute
   '/trade-detail/$id': typeof AuthenticatedTradeDetailIdRoute
 }
 export interface FileRoutesByTo {
@@ -118,14 +126,15 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/command-center': typeof AuthenticatedCommandCenterRoute
+  '/community': typeof AuthenticatedCommunityRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/journal': typeof AuthenticatedJournalRoute
   '/metafund': typeof AuthenticatedMetafundRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/strategy-profiles': typeof AuthenticatedStrategyProfilesRoute
+  '/trade-analysis': typeof AuthenticatedTradeAnalysisRoute
   '/trade-creator': typeof AuthenticatedTradeCreatorRoute
   '/validator': typeof AuthenticatedValidatorRoute
-  '/community': typeof AuthenticatedCommunityRoute
   '/trade-detail/$id': typeof AuthenticatedTradeDetailIdRoute
 }
 export interface FileRoutesById {
@@ -135,14 +144,15 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/reset-password': typeof ResetPasswordRoute
   '/_authenticated/command-center': typeof AuthenticatedCommandCenterRoute
+  '/_authenticated/community': typeof AuthenticatedCommunityRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/journal': typeof AuthenticatedJournalRoute
   '/_authenticated/metafund': typeof AuthenticatedMetafundRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/strategy-profiles': typeof AuthenticatedStrategyProfilesRoute
+  '/_authenticated/trade-analysis': typeof AuthenticatedTradeAnalysisRoute
   '/_authenticated/trade-creator': typeof AuthenticatedTradeCreatorRoute
   '/_authenticated/validator': typeof AuthenticatedValidatorRoute
-  '/_authenticated/community': typeof AuthenticatedCommunityRoute
   '/_authenticated/trade-detail/$id': typeof AuthenticatedTradeDetailIdRoute
 }
 export interface FileRouteTypes {
@@ -152,14 +162,15 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/command-center'
+    | '/community'
     | '/dashboard'
     | '/journal'
     | '/metafund'
     | '/profile'
     | '/strategy-profiles'
+    | '/trade-analysis'
     | '/trade-creator'
     | '/validator'
-    | '/community'
     | '/trade-detail/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -167,14 +178,15 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/command-center'
+    | '/community'
     | '/dashboard'
     | '/journal'
     | '/metafund'
     | '/profile'
     | '/strategy-profiles'
+    | '/trade-analysis'
     | '/trade-creator'
     | '/validator'
-    | '/community'
     | '/trade-detail/$id'
   id:
     | '__root__'
@@ -183,14 +195,15 @@ export interface FileRouteTypes {
     | '/auth'
     | '/reset-password'
     | '/_authenticated/command-center'
+    | '/_authenticated/community'
     | '/_authenticated/dashboard'
     | '/_authenticated/journal'
     | '/_authenticated/metafund'
     | '/_authenticated/profile'
     | '/_authenticated/strategy-profiles'
+    | '/_authenticated/trade-analysis'
     | '/_authenticated/trade-creator'
     | '/_authenticated/validator'
-    | '/_authenticated/community'
     | '/_authenticated/trade-detail/$id'
   fileRoutesById: FileRoutesById
 }
@@ -203,18 +216,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/reset-password': {
-      id: '/reset-password'
-      path: '/reset-password'
-      fullPath: '/reset-password'
-      preLoaderRoute: typeof ResetPasswordRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/auth': {
-      id: '/auth'
-      path: '/auth'
-      fullPath: '/auth'
-      preLoaderRoute: typeof AuthRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -224,60 +230,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/trade-creator': {
-      id: '/_authenticated/trade-creator'
-      path: '/trade-creator'
-      fullPath: '/trade-creator'
-      preLoaderRoute: typeof AuthenticatedTradeCreatorRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
     }
-    '/_authenticated/strategy-profiles': {
-      id: '/_authenticated/strategy-profiles'
-      path: '/strategy-profiles'
-      fullPath: '/strategy-profiles'
-      preLoaderRoute: typeof AuthenticatedStrategyProfilesRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/profile': {
-      id: '/_authenticated/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof AuthenticatedProfileRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/metafund': {
-      id: '/_authenticated/metafund'
-      path: '/metafund'
-      fullPath: '/metafund'
-      preLoaderRoute: typeof AuthenticatedMetafundRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/journal': {
-      id: '/_authenticated/journal'
-      path: '/journal'
-      fullPath: '/journal'
-      preLoaderRoute: typeof AuthenticatedJournalRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/dashboard': {
-      id: '/_authenticated/dashboard'
-      path: '/dashboard'
-      fullPath: '/dashboard'
-      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/validator': {
-      id: '/_authenticated/validator'
-      path: '/validator'
-      fullPath: '/validator'
-      preLoaderRoute: typeof AuthenticatedValidatorRouteImport
+    '/_authenticated/command-center': {
+      id: '/_authenticated/command-center'
+      path: '/command-center'
+      fullPath: '/command-center'
+      preLoaderRoute: typeof AuthenticatedCommandCenterRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/community': {
@@ -287,11 +258,60 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCommunityRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/command-center': {
-      id: '/_authenticated/command-center'
-      path: '/command-center'
-      fullPath: '/command-center'
-      preLoaderRoute: typeof AuthenticatedCommandCenterRouteImport
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/journal': {
+      id: '/_authenticated/journal'
+      path: '/journal'
+      fullPath: '/journal'
+      preLoaderRoute: typeof AuthenticatedJournalRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/metafund': {
+      id: '/_authenticated/metafund'
+      path: '/metafund'
+      fullPath: '/metafund'
+      preLoaderRoute: typeof AuthenticatedMetafundRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/profile': {
+      id: '/_authenticated/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof AuthenticatedProfileRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/strategy-profiles': {
+      id: '/_authenticated/strategy-profiles'
+      path: '/strategy-profiles'
+      fullPath: '/strategy-profiles'
+      preLoaderRoute: typeof AuthenticatedStrategyProfilesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/trade-analysis': {
+      id: '/_authenticated/trade-analysis'
+      path: '/trade-analysis'
+      fullPath: '/trade-analysis'
+      preLoaderRoute: typeof AuthenticatedTradeAnalysisRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/trade-creator': {
+      id: '/_authenticated/trade-creator'
+      path: '/trade-creator'
+      fullPath: '/trade-creator'
+      preLoaderRoute: typeof AuthenticatedTradeCreatorRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/validator': {
+      id: '/_authenticated/validator'
+      path: '/validator'
+      fullPath: '/validator'
+      preLoaderRoute: typeof AuthenticatedValidatorRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/trade-detail/$id': {
@@ -306,27 +326,29 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedCommandCenterRoute: typeof AuthenticatedCommandCenterRoute
+  AuthenticatedCommunityRoute: typeof AuthenticatedCommunityRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedJournalRoute: typeof AuthenticatedJournalRoute
   AuthenticatedMetafundRoute: typeof AuthenticatedMetafundRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedStrategyProfilesRoute: typeof AuthenticatedStrategyProfilesRoute
+  AuthenticatedTradeAnalysisRoute: typeof AuthenticatedTradeAnalysisRoute
   AuthenticatedTradeCreatorRoute: typeof AuthenticatedTradeCreatorRoute
   AuthenticatedValidatorRoute: typeof AuthenticatedValidatorRoute
-  AuthenticatedCommunityRoute: typeof AuthenticatedCommunityRoute
   AuthenticatedTradeDetailIdRoute: typeof AuthenticatedTradeDetailIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedCommandCenterRoute: AuthenticatedCommandCenterRoute,
+  AuthenticatedCommunityRoute: AuthenticatedCommunityRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedJournalRoute: AuthenticatedJournalRoute,
   AuthenticatedMetafundRoute: AuthenticatedMetafundRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedStrategyProfilesRoute: AuthenticatedStrategyProfilesRoute,
+  AuthenticatedTradeAnalysisRoute: AuthenticatedTradeAnalysisRoute,
   AuthenticatedTradeCreatorRoute: AuthenticatedTradeCreatorRoute,
   AuthenticatedValidatorRoute: AuthenticatedValidatorRoute,
-  AuthenticatedCommunityRoute: AuthenticatedCommunityRoute,
   AuthenticatedTradeDetailIdRoute: AuthenticatedTradeDetailIdRoute,
 }
 
