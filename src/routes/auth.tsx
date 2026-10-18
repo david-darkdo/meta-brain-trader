@@ -18,7 +18,14 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/auth")({
   validateSearch: searchSchema,
   head: () => ({
-    meta: [{ title: "Sign in — MetaBrain Trader" }],
+    meta: [
+      { title: "Sign in — MetaBrain Trader" },
+      { name: "description", content: "Sign in to your MetaBrain Trader workspace to manage trades and review your trading journal." },
+      { property: "og:title", content: "Sign in — MetaBrain Trader" },
+      { property: "og:description", content: "Sign in to your MetaBrain Trader workspace to manage trades and review your trading journal." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
   }),
   component: AuthPage,
 });

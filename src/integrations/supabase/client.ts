@@ -28,9 +28,6 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 }
 
 
-const TARGET_SUPABASE_URL = "https://jqptprskuxkhfoxsvwcl.supabase.co";
-const TARGET_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpxcHRwcnNrdXhraGZveHN2d2NsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODYxMzQzOTAsImV4cCI6MjEwMTcxMDM5MH0.uSSUrrH3xWSoqcOcc88LBePB5SGNL_fARHZzAj94cvM";
-
 function createSupabaseClient() {
   // Use import.meta.env for client-side (Vite build-time replacement)
   // Fall back to process.env for SSR (server-side rendering) or target constants
