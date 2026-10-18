@@ -29,12 +29,15 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 
 
 function createSupabaseClient() {
-  // Use the active project's environment for both browser and server clients.
-  const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL;
-  const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY;
+  // Use import.meta.env for client-side (Vite build-time replacement)
+  // Fall back to process.env for SSR (server-side rendering) or target constants
+  let SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || TARGET_SUPABASE_URL;
+  let SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || TARGET_SUPABASE_KEY;
 
-  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-    throw new Error("Supabase URL and publishable key must be configured.");
+  // Ensure legacy or empty source project URLs are normalized to target backend
+  if (SUPABASE_URL.includes("qlfauxgzlooqebtpmcte") || !SUPABASE_URL) {
+    SUPABASE_URL = TARGET_SUPABASE_URL;
+    SUPABASE_PUBLISHABLE_KEY = TARGET_SUPABASE_KEY;
   }
 
   return createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
