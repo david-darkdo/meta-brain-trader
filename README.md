@@ -759,3 +759,36 @@ The audit must inspect the actual:
 The audit must identify what is canonical, what is legacy, what is incomplete, what is reusable, what is unsafe to modify, and what is missing.
 
 **No major implementation should begin until the audit report and resulting implementation roadmap have been reviewed and reconciled.**
+
+---
+
+# Independent Deployment Boundaries (Critical)
+
+This repository is a shared source-code repository used by two independently operated deployments:
+- **Vercel deployment:** the independently operated production application.
+- **Lovable deployment:** Lovable's independently operated application and managed backend.
+
+Sharing source code does NOT mean sharing runtime configuration, credentials, databases, or deployment ownership.
+
+## Vercel deployment rules
+- Vercel is the authority for the Vercel deployment's environment variables.
+- The Vercel deployment must use its own configured Supabase URL and publishable key, and its own OpenAI credential.
+- OpenAI credentials must remain server-side and must never be placed in VITE_ variables or committed to Git.
+- Vercel must not depend on LOVABLE_API_KEY, the Lovable AI Gateway, or Lovable-managed Supabase credentials.
+- Existing Vercel production Supabase data, authentication, storage, Edge Functions, and policies must be preserved unless a separately reviewed migration is explicitly approved.
+
+## Lovable deployment rules
+- Lovable owns and operates its existing managed Supabase backend and its own Lovable AI credentials.
+- Lovable must keep its backend credentials and AI-provider configuration within its own managed environment.
+- Lovable-generated secrets, API keys, Supabase project references, and deployment-specific configuration must never be committed to this shared repository.
+- Lovable changes must not replace or hard-code the Vercel deployment's Supabase target or AI provider.
+
+## Shared-code contribution rules
+- Keep provider and backend selection deployment-specific through server-side environment configuration or isolated deployment adapters.
+- Never hard-code either deployment's credentials or private backend identifiers into shared application code.
+- Do not change the Vercel production Supabase client, schema, storage, RLS, or historical records as part of Lovable-only work.
+- Before merging or pushing a change, verify that it does not force one deployment to use the other deployment's AI provider, credentials, Supabase project, or runtime.
+- Changes that affect deployment boundaries must be documented and tested independently for both deployments.
+- If a change is specific to one deployment, isolate it behind a deployment-specific adapter/configuration rather than making the other deployment inherit it.
+
+**Non-negotiable:** GitHub is the shared source-code location only. It is not a shared credentials store, shared runtime, or shared database.
