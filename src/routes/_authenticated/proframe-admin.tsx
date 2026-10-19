@@ -19,6 +19,8 @@ export const Route = createFileRoute("/_authenticated/proframe-admin")({
 function ProframeAdmin() {
   const qc = useQueryClient();
   const [product, setProduct] = useState({ name: "", slug: "", summary: "", provider: "", price: "", currency: "USD", size: "100000", maxDd: "10", dailyDd: "5", risk: "0.5", target: "3", split: "70", terms: "" });
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editVersion, setEditVersion] = useState<any>(null);
   const [provider, setProvider] = useState({ provider_name: "", account_reference: "", account_size: "100000", currency: "USD", procurement_cost: "0", procurement_currency: "USD", status: "AVAILABLE", operator_mt_reference: "", notes: "" });
 
   const productsQ = useQuery({
@@ -61,6 +63,44 @@ function ProframeAdmin() {
     onSuccess: () => { toast.success("Proframe draft created"); setProduct({ name: "", slug: "", summary: "", provider: "", price: "", currency: "USD", size: "100000", maxDd: "10", dailyDd: "5", risk: "0.5", target: "3", split: "70", terms: "" }); qc.invalidateQueries({ queryKey: ["proframe-admin-products"] }); },
     onError: (e: any) => toast.error(e.message || "Could not create Proframe"),
   });
+
+  const beginEdit = (p: any) => {
+    const v = (p.proframe_product_versions ?? []).find((x: any) => x.id === p.current_version_id);
+    if (!v) { toast.error("Current bundle version was not found."); return; }
+    setEditingId(p.id);
+    setEditVersion({ name: p.name, slug: p.slug, summary: p.summary ?? "", provider: v.provider_name,
+      price: String(v.price), currency: v.currency, size: String(v.provider_account_size),
+      maxDd: String(v.max_drawdown_pct), dailyDd: String(v.daily_drawdown_pct),
+      risk: String(v.default_risk_pct), target: String(v.payout_target_pct),
+      split: String(v.profit_split_investor_pct), terms: v.terms_text ?? "" });
+  };
+
+  const saveEditedVersion = async () => {
+    if (!editingId || !editVersion) return;
+    const current = products.find((p: any) => p.id === editingId);
+    if (!current) return;
+    const versions = current.proframe_product_versions ?? [];
+    const nextVersion = Math.max(0, ...versions.map((v: any) => Number(v.version_number))) + 1;
+    const { data: v, error: ve } = await supabase.from("proframe_product_versions").insert({
+      product_id: editingId, version_number: nextVersion, price: Number(editVersion.price),
+      currency: editVersion.currency, provider_name: editVersion.provider.trim(),
+      account_type: "INSTANT_FUNDING", provider_account_size: Number(editVersion.size),
+      max_drawdown_pct: Number(editVersion.maxDd), daily_drawdown_pct: Number(editVersion.dailyDd),
+      default_risk_pct: Number(editVersion.risk), payout_target_pct: Number(editVersion.target),
+      profit_split_investor_pct: Number(editVersion.split), terms_text: editVersion.terms,
+      is_published: current.status === "ACTIVE",
+    }).select("id").single();
+    if (ve) { toast.error(ve.message); return; }
+    const { error: pe } = await supabase.from("proframe_products").update({
+      name: editVersion.name.trim(), slug: editVersion.slug.trim().toLowerCase(),
+      summary: editVersion.summary.trim(), current_version_id: v.id,
+    }).eq("id", editingId);
+    if (pe) { toast.error(pe.message); return; }
+    toast.success("New version saved. Previous terms remain in history.");
+    setEditingId(null); setEditVersion(null);
+    qc.invalidateQueries({ queryKey: ["proframe-admin-products"] });
+    qc.invalidateQueries({ queryKey: ["public-proframe-catalogue"] });
+  };
 
   const saveProvider = useMutation({
     mutationFn: async () => {
@@ -119,7 +159,7 @@ function ProframeAdmin() {
 
     <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
       <div className="mb-4 flex items-center gap-2"><Package className="h-5 w-5 text-amber-400"/><h2 className="font-semibold">Catalogue management</h2></div>
-      {productsQ.isLoading ? <p className="text-sm text-muted-foreground">Loading bundles…</p> : products.length===0 ? <p className="text-sm text-muted-foreground">No Proframe bundles created yet.</p> : <div className="space-y-3">{products.map((p:any)=><div key={p.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border p-3"><div><p className="font-semibold">{p.name}</p><p className="text-xs text-muted-foreground">{p.slug} · {p.proframe_product_versions?.length ?? 0} version(s) · {p.status}</p></div><div className="flex gap-2">{p.status!=="ACTIVE" ? <button onClick={()=>setProductStatus(p.id,"ACTIVE")} className="rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-black">Publish</button> : <button onClick={()=>setProductStatus(p.id,"PAUSED")} className="rounded-lg border border-border px-3 py-2 text-xs">Pause</button>}</div></div>)}</div>}
+      {productsQ.isLoading ? <p className="text-sm text-muted-foreground">Loading bundles…</p> : products.length===0 ? <p className="text-sm text-muted-foreground">No Proframe bundles created yet.</p> : <div className="space-y-3">{products.map((p:any)=><div key={p.id} className="rounded-xl border border-border p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{p.name}</p><p className="text-xs text-muted-foreground">{p.slug} · {p.proframe_product_versions?.length ?? 0} version(s) · {p.status}</p></div><div className="flex gap-2"><button onClick={()=>beginEdit(p)} className="rounded-lg border border-border px-3 py-2 text-xs">Edit</button>{p.status!=="ACTIVE" ? <button onClick={()=>setProductStatus(p.id,"ACTIVE")} className="rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-black">Publish</button> : <button onClick={()=>setProductStatus(p.id,"PAUSED")} className="rounded-lg border border-border px-3 py-2 text-xs">Pause</button>}</div></div>{editingId===p.id && editVersion && <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2">{[["name","Bundle name"],["slug","URL slug"],["summary","Description"],["provider","Provider"],["price","Activation fee"],["currency","Currency"],["size","Provider account size"],["maxDd","Maximum drawdown %"],["dailyDd","Daily drawdown %"],["risk","Per-trade risk %"],["target","Payout eligibility target %"],["split","Investor profit share %"]].map(([key,title])=><label key={key} className="text-xs text-muted-foreground">{title}<input className={field+" mt-1"} value={editVersion[key]} onChange={e=>setEditVersion({...editVersion,[key]:e.target.value})}/></label>)}<label className="sm:col-span-2 text-xs text-muted-foreground">Terms and provider rules<textarea className={field+" mt-1"} rows={3} value={editVersion.terms} onChange={e=>setEditVersion({...editVersion,terms:e.target.value})}/></label><div className="sm:col-span-2 flex justify-end gap-2"><button onClick={()=>{setEditingId(null);setEditVersion(null)}} className="rounded-lg border border-border px-3 py-2 text-xs">Cancel</button><button onClick={saveEditedVersion} className="rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-black">Save new version</button></div><p className="sm:col-span-2 text-xs text-muted-foreground">Edits create a new version; previous pricing and rules are preserved for audit.</p></div>}</div>)}</div>}
     </section>
 
     <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
