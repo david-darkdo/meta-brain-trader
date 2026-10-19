@@ -1,0 +1,113 @@
+# MetaBrain Trader — Investor / CEO Platform Rebuild Plan
+
+## Working method
+
+Build in small, vertical milestones. Each milestone includes the minimum database/RLS/RPC work and the corresponding UI, then tests both before moving on. Preserve current production records and existing working flows. Do not redesign unrelated screens or add speculative features. No destructive migration or table retirement without a verified replacement and explicit approval.
+
+## Production baseline audited
+
+- Supabase project: `jqptprskuxkhfoxsvwcl` (current Vercel production backend).
+- 30 public tables; all 30 have RLS enabled.
+- Existing financial foundation includes `investor_accounts`, `capital_events`, `investment_cycles`, `trade_participations`, `financial_ledger`, `withdrawal_requests`, `chart_of_accounts`, `journal_entries`, and `journal_lines`.
+- Existing privileged financial RPCs include deposit intent/proof, deposit approval/activation, withdrawal request/approval/settlement, cycle creation/activation/closure, trade allocation, and reconciliation.
+- Existing role model uses `user_roles`, `is_admin()`, and `is_investor()`. Admin routes already perform server/database-backed admin checks.
+- Existing pre-trade and post-trade Edge Functions are active (pre-trade v13, post-trade v7).
+- Current production records at audit: 13 trades, 34 screenshots, 91 AI analyses, 10 user profile rows, 3 role rows, 2 investor accounts, 4 capital events, 1 investment cycle, 6 financial-ledger events, 2 withdrawal requests, 6 journal entries and 12 journal lines. Do not reset or replace these records.
+- Existing authenticated navigation has four tabs: Validator, MetaFund, Community and Profile. The root route currently redirects signed-in users to Validator and signed-out users to Auth.
+- Existing MetaFund is already a functioning investor-capital workflow (deposit proof, admin review, cycle, trade participation, withdrawals). Existing Command Center is admin-gated.
+- Existing Community is currently a static “Coming Soon” page, not a working community system.
+
+## Architecture gaps against the new vision
+
+1. **Investor / CEO separation:** Current shared navigation exposes the Validator tab to every authenticated user. The validator routes themselves need a reliable CEO/admin gate, not just a hidden link.
+2. **Investor homepage:** The root route is a redirect, not a public-facing firm homepage or Proframe catalogue.
+3. **Account model:** `investor_accounts` currently represents the existing normal investor account. There is no explicit account type / parent-child relationship for Main versus individually purchased Proframe accounts.
+4. **Proframe catalogue and purchase:** No product catalogue, purchasable Proframe plan, order, purchase RPC or purchase lifecycle exists.
+5. **Ledger attribution:** Current financial events and accounting are investor-level. Proframe requires every relevant balance movement and journal line to be attributable to the correct account and Proframe instance.
+6. **Trade allocation:** `trade_participations` currently references `investor_accounts` directly and defaults to 1% risk. It does not yet identify a Proframe account or enforce separate 2% Main / 0.5% Proframe risk policies.
+7. **Profit distribution:** Existing cycle close and 70/30 settlement foundation is for the current investor capital model. Proframe cycle profit must be settled to the investor's Main Account without confusing the Proframe's own capital, trading P&L, or the investor's distributable profit.
+8. **Community:** Community content, posts, lessons and announcements do not yet have a backend model.
+9. **Public performance claims:** Homepage metrics must be sourced from verified, approved records and clearly distinguish historical performance from targets or projections.
+
+## Target experience
+
+### Investor
+- Public Homepage: firm introduction, how the model works, cycle/risk explanation, available Proframes, pricing, verified performance disclosures, deposit / purchase / sign-in actions.
+- MetaFund: explicit Main Account and Proframe account switcher. The selected account controls all displayed balances, activity, trading history, status and eligible actions.
+- Community: investor-safe education, CEO-published trade lessons/updates, announcements and discussions.
+- Profile: identity, verification, security and preferences.
+- No access to Validator, trade creation, private strategy configuration or CEO Command Center.
+
+### CEO
+- Existing Command Center and Trade Validator remain available.
+- CEO can also preview/open the public Homepage.
+- CEO manages investors, products, Proframes, risk policies, cycles, settlements, community publishing and reconciliation.
+- Existing ADMIN role is retained as the CEO permission boundary unless the audit finds a reason to extend roles.
+
+## Milestones (vertical slices: backend + UI together)
+
+### M0 — Audit and freeze (completed)
+- [x] Audit production schema, RLS, financial RPCs, migrations, functions and current routes.
+- [x] Record current data counts and protect existing records.
+- [x] Identify architecture gaps before changing schema.
+
+### M1 — Role-aware application shell
+- [ ] Keep the public root route available to visitors and signed-in users.
+- [ ] Build role-aware navigation: Investor = Home / MetaFund / Community / Profile; CEO = Validator / MetaFund / Community / Profile, with a Homepage preview/action.
+- [ ] Gate every Validator route and private trade API/RPC to CEO/admin at the database/server boundary.
+- [ ] Add route tests for anonymous, investor and CEO access.
+
+### M2 — Proframe domain model + catalogue
+- [ ] Add versioned Proframe products/plans and availability/status.
+- [ ] Add Proframe account instances with owner, product snapshot, lifecycle state, currency and risk policy.
+- [ ] Add an account-aware ledger/attribution layer while preserving investor-level reporting.
+- [ ] Add atomic, idempotent purchase operation and audit trail.
+- [ ] Build CEO product management and public catalogue UI.
+- [ ] Test purchase eligibility, insufficient balance, duplicate requests and account creation.
+
+### M3 — Main Account and Proframe account experience
+- [ ] Extend account switcher and financial summary to return the selected account.
+- [ ] Keep Main Account deposits and withdrawals distinct from Proframe capital.
+- [ ] Show Proframe status, capital, performance, trade history and distributions.
+- [ ] Test that switching accounts never mixes balances or histories.
+
+### M4 — Account-specific trading risk and allocations
+- [ ] Resolve risk basis and snapshot account type/risk policy at trade allocation time.
+- [ ] Enforce Main Account 2% and Proframe 0.5% as separate server-side policies.
+- [ ] Link each trade participation to the exact account / Proframe instance.
+- [ ] Preserve existing execution boundary and immutable allocation snapshots.
+- [ ] Test risk calculations, concurrent allocations and loss handling.
+
+### M5 — Proframe cycle settlement
+- [ ] Add Proframe-specific cycle participation and settlement attribution.
+- [ ] Calculate gross P&L, investor/company split and net distributable profit.
+- [ ] Credit investor share to Main Account through balanced, idempotent ledger/journal entries.
+- [ ] Define and implement Proframe loss / breach / account termination rules.
+- [ ] Test profitable, losing, zero-P&L, duplicate-settlement and reversal cases.
+
+### M6 — Investor homepage and Community
+- [ ] Complete firm homepage, catalogue, how-it-works and risk disclosures.
+- [ ] Build Community publishing and investor-safe read access.
+- [ ] Allow CEO to publish educational trade summaries without exposing Validator internals.
+- [ ] Test permissions and mobile usability.
+
+### M7 — Production certification
+- [ ] Reconcile financial ledger and double-entry accounting.
+- [ ] Run investor and CEO end-to-end acceptance tests.
+- [ ] Verify all protected routes and RLS policies with separate test users.
+- [ ] Verify deployment, rollback path, audit trail and existing record preservation.
+
+## Explicit non-goals for this rebuild
+
+- Do not delete or replace existing investor, trade, screenshot, analysis, deposit, withdrawal or accounting records.
+- Do not rebuild the existing AI validator or change its trading strategy as part of the investor-platform work.
+- Do not add broker integrations, payment-gateway automation, subscriptions or unrelated features without a separate requirement.
+- Do not display unverified returns or promise that an account cannot lose money.
+
+## One required product rule before M2 database design
+
+Confirm whether the amount paid to purchase a Proframe is:
+- **A.** the actual capital assigned to that Proframe trading account; or
+- **B.** a purchase/access fee, with trading capital funded separately.
+
+This determines purchase accounting, account capital, withdrawals, loss limits and profit calculations. Do not guess.
