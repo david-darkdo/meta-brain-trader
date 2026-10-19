@@ -64,3 +64,11 @@ export function getActivePlatform(pathname: string): BoardPlatform["id"] {
   // Default to Meta Validator for /validator, /dashboard, /trade-creator, /journal, /strategy-profiles, /trade-detail, etc.
   return "validator";
 }
+
+
+/** Investor navigation never exposes private trading workspaces. */
+export function getVisiblePlatforms(isAdmin: boolean): readonly BoardPlatform[] {
+  return isAdmin
+    ? BOARD_PLATFORMS
+    : BOARD_PLATFORMS.filter((platform) => platform.id !== "validator");
+}
