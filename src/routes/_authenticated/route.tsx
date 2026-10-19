@@ -1,7 +1,7 @@
 import { createFileRoute, Outlet, redirect, Link, useRouterState } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { BOARD_PLATFORMS, getActivePlatform } from "@/lib/board-navigation";
+import { BOARD_PLATFORMS, getActivePlatform, getVisiblePlatforms } from "@/lib/board-navigation";
 import { MetaBrainLogo } from "@/components/metabrain-logo";
 import { Bell } from "lucide-react";
 
@@ -13,7 +13,14 @@ export const Route = createFileRoute("/_authenticated")({
       if (error || !data?.user) {
         throw redirect({ to: "/auth", search: { redirect: location.pathname } });
       }
-      return { user: data.user };
+      const { data: isAdmin, error: roleError } = await supabase.rpc("is_admin", { p_user_id: data.user.id });
+      if (roleError) throw roleError;
+      const admin = isAdmin === true;
+      const privateTradingPaths = ["/validator", "/dashboard", "/trade-creator", "/journal", "/trade-analysis", "/strategy-profiles", "/trade-detail"];
+      if (!admin && privateTradingPaths.some((path) => location.pathname === path || location.pathname.startsWith(path + "/"))) {
+        throw redirect({ to: "/metafund" });
+      }
+      return { user: data.user, isAdmin: admin };
     } catch (err: any) {
       if (err?.to || err?.isRedirect) throw err;
       console.warn("Auth beforeLoad error, redirecting to /auth:", err);
@@ -26,6 +33,18 @@ export const Route = createFileRoute("/_authenticated")({
 function MetaBrainBoardShell() {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const activePlatformId = getActivePlatform(pathname);
+  const roleQ = useQuery({
+    queryKey: ["current_user_is_admin"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      if (!data.user) return false;
+      const { data: admin, error } = await supabase.rpc("is_admin", { p_user_id: data.user.id });
+      if (error) throw error;
+      return admin === true;
+    },
+    staleTime: 60_000,
+  });
+  const isAdmin = roleQ.data === true;
 
   // Fetch current user details for header avatar
   const userQ = useQuery({
@@ -50,7 +69,7 @@ function MetaBrainBoardShell() {
         <div className="mx-auto flex max-w-4xl items-center justify-between px-4 py-2.5 sm:px-6">
           {/* BRAND LOGO */}
           <Link
-            to="/validator"
+            to={isAdmin ? "/validator" : "/"}
             className="flex items-center gap-2 group focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-md"
           >
             <MetaBrainLogo size="sm" showText={true} />
@@ -76,6 +95,12 @@ function MetaBrainBoardShell() {
         </div>
       </header>
 
+      {isAdmin && (
+        <div className="mx-auto flex w-full max-w-4xl justify-end px-4 pt-2 sm:px-6">
+          <Link to="/" className="text-xs font-medium text-amber-400 hover:text-amber-300">View Investor Homepage ↗</Link>
+        </div>
+      )}
+
       {/* 2. ACTIVE PLATFORM CONTENT SURFACE */}
       <main className="flex-1 min-w-0 w-full max-w-full mx-auto px-3 py-5 sm:max-w-4xl sm:px-6 sm:py-7 pb-24 sm:pb-24 overflow-x-hidden">
         <Outlet />
@@ -87,7 +112,7 @@ function MetaBrainBoardShell() {
         className="fixed bottom-0 inset-x-0 z-40 border-t border-border/80 bg-background/95 backdrop-blur-xl shadow-[0_-4px_25px_rgba(0,0,0,0.4)]"
       >
         <div className="mx-auto flex w-full max-w-4xl items-center justify-around px-1.5 py-1.5 sm:px-2 sm:py-2">
-          {BOARD_PLATFORMS.map((platform) => {
+          {getVisiblePlatforms(isAdmin).map((platform) => {
             const isActive = platform.id === activePlatformId;
             const Icon = platform.icon;
 
