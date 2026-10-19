@@ -97,7 +97,7 @@ function MetaBrainBoardShell() {
 
       {isAdmin && (
         <div className="mx-auto flex w-full max-w-4xl justify-end px-4 pt-2 sm:px-6">
-          <Link to="/" className="text-xs font-medium text-amber-400 hover:text-amber-300">View Investor Homepage ↗</Link>
+          <Link to="/proframe-admin" className="text-xs font-medium text-amber-400 hover:text-amber-300">Proframe Operations ↗</Link><span className="text-muted-foreground">·</span><Link to="/" className="text-xs font-medium text-amber-400 hover:text-amber-300">View Investor Homepage ↗</Link>
         </div>
       )}
 
