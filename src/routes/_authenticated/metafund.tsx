@@ -106,7 +106,7 @@ function InvestorMetaFundDashboard() {
   });
   const purchaseProframeMutation = useMutation({
     mutationFn: async (productId:string) => {
-      const {data,error}=await supabase.rpc("purchase_proframe_bundle",{p_product_id:productId,p_idempotency_key:crypto.randomUUID()});
+      const {data,error}=await (supabase as any).rpc("purchase_proframe_bundle",{p_product_id:productId,p_idempotency_key:crypto.randomUUID()});
       if(error) throw error;
       return data as any;
     },
