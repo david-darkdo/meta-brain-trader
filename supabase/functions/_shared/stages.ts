@@ -59,6 +59,12 @@ function sys(base: string, os: PromptOS | null, engines: EngineKey[]) {
 
 export async function runStage(stage: StageName, ctx: StageContext) {
   const os = ctx.promptOS;
+  const ai = (options: Omit<AICallOptions, "authorizationToken" | "tradeId">) =>
+    callAI({
+      ...options,
+      authorizationToken: ctx.authorizationToken,
+      tradeId: String(ctx.trade.trade_id),
+    });
 
   switch (stage) {
     case "BLIND":
