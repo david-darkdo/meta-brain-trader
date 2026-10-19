@@ -78,7 +78,7 @@ function ProframeAdmin() {
     if (!current) return;
     const versions = current.proframe_product_versions ?? [];
     const nextVersion = Math.max(0, ...versions.map((v: any) => Number(v.version_number))) + 1;
-    const { data: v, error: ve } = await supabase.from("proframe_product_versions").insert({
+    const { data: v, error: ve } = await (supabase as any).from("proframe_product_versions").insert({
       product_id: editingId, version_number: nextVersion, price: Number(editVersion.price), compare_at_price: editVersion.compareAtPrice ? Number(editVersion.compareAtPrice) : null,
       currency: editVersion.currency, provider_account_currency: editVersion.sizeCurrency, provider_name: editVersion.provider.trim(),
       account_type: "INSTANT_FUNDING", provider_account_size: Number(editVersion.size),
