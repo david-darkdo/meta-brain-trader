@@ -144,6 +144,7 @@ async function runPipeline(tradeId: string, accessToken: string) {
 
   const ctx: PostStageContext = {
     trade,
+    authorizationToken: accessToken,
     result: result ?? null,
     reflections: reflections ?? [],
     priorPre,
@@ -260,6 +261,13 @@ Deno.serve(async (req) => {
   try {
     const { trade_id } = await req.json();
     if (!trade_id) throw new Error("trade_id required");
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) return new Response(JSON.stringify({ error: "Authentication required." }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const accessToken = authHeader.slice("Bearer ".length);
+    const { data: authData, error: authError } = await admin.auth.getUser(accessToken);
+    if (authError || !authData.user) return new Response(JSON.stringify({ error: "Invalid authentication token." }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const { data: targetTrade } = await admin.from("trades").select("user_id").eq("trade_id", trade_id).maybeSingle();
+    if (!targetTrade || targetTrade.user_id !== authData.user.id) return new Response(JSON.stringify({ error: "Trade not found or access denied." }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     await admin
       .from("trades")
