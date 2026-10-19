@@ -76,7 +76,7 @@ Build in small, vertical milestones. Each milestone includes the minimum databas
 - [ ] Enforce Main Account 2% and Proframe 0.5% as separate server-side policies.
 - [ ] Link each trade participation to the exact investor participation and operator-procured third-party prop-firm account.
 - [ ] Preserve existing execution boundary and immutable allocation snapshots.
-- [ ] Test risk calculations, concurrent allocations and loss handling.
+- [ ] Calculate the 3% payout threshold from the configured profile's defined reference balance and eligible realised profit; show progress and remaining amount. A 3% target is a payout eligibility condition, not a promise or guarantee. Two trades at 0.5% risk do not automatically guarantee reaching 3%; actual outcome depends on results.\n- [ ] Test risk calculations, concurrent allocations, rule-profile versioning and loss handling.
 
 ### M5 — Proframe cycle settlement
 - [ ] Add Proframe-specific cycle participation and settlement attribution.
