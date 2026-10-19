@@ -35,7 +35,8 @@ const baseSchema = (extra: Record<string, unknown>, required: string[]) => ({
 });
 
 export type PostStageContext = {
-  trade: Record<string, unknown>;\n  authorizationToken: string;
+  trade: Record<string, unknown>;
+  authorizationToken: string;
   result: Record<string, unknown> | null;
   reflections: Array<Record<string, unknown>>;
   priorPre: Record<string, unknown>;
