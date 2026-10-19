@@ -98,12 +98,23 @@ function InvestorMetaFundDashboard() {
       if (error) throw error;
       const ids=(products??[]).map((p:any)=>p.current_version_id).filter(Boolean);
       if (!ids.length) return [];
-      const { data: versions, error: ve }=await supabase.from("proframe_product_versions").select("id,price,currency,provider_account_size,default_risk_pct,payout_target_pct").in("id",ids).eq("is_published",true);
+      const { data: versions, error: ve }=await supabase.from("proframe_product_versions").select("id,price,currency,provider_name,provider_account_size,default_risk_pct,payout_target_pct").in("id",ids).eq("is_published",true);
       if(ve) throw ve;
       const byId=new Map((versions??[]).map((v:any)=>[v.id,v]));
       return (products??[]).map((p:any)=>({...p,version:byId.get(p.current_version_id)})).filter((p:any)=>p.version);
     }
   });
+  useEffect(() => {
+    const requestedProductId = new URLSearchParams(window.location.search).get("purchase");
+    if (!requestedProductId || !proframeCatalogueQ.data?.length) return;
+    const requestedProduct = proframeCatalogueQ.data.find((item: any) => item.id === requestedProductId);
+    if (requestedProduct) {
+      setCheckoutProduct(requestedProduct);
+      setCheckoutOpen(true);
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, [proframeCatalogueQ.data]);
+
   const purchaseProframeMutation = useMutation({
     mutationFn: async (productId:string) => {
       const {data,error}=await (supabase as any).rpc("purchase_proframe_bundle",{p_product_id:productId,p_idempotency_key:crypto.randomUUID()});
@@ -317,7 +328,7 @@ function InvestorMetaFundDashboard() {
     <div className="space-y-6">
       <section className="rounded-2xl border border-amber-500/20 bg-card/50 p-4 sm:p-5 space-y-3">
         <div><h2 className="text-lg font-bold">Proframe bundles</h2><p className="text-xs text-muted-foreground">Purchase using your Main Account balance or fund it externally first.</p></div>
-        {proframeCatalogueQ.isLoading ? <p className="text-xs text-muted-foreground">Loading bundles…</p> : proframeCatalogueQ.data?.length ? <div className="grid gap-3 sm:grid-cols-2">{proframeCatalogueQ.data.map((p:any)=><article key={p.id} className="rounded-xl border border-border bg-background/60 p-4"><div className="flex justify-between gap-2"><b>{p.name}</b><Badge variant="outline">Instant Funding</Badge></div><p className="mt-1 text-xs text-muted-foreground">{p.summary}</p><p className="mt-3 text-2xl font-bold text-amber-300">{p.version.currency} {Number(p.version.provider_account_size).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">account size</span></p><p className="text-sm">Activation fee: <b>{p.version.currency} {Number(p.version.price).toLocaleString()}</b></p><Button className="mt-3 w-full gold-gradient-btn" onClick={()=>{setCheckoutProduct(p);setCheckoutOpen(true)}}>Purchase bundle</Button></article>)}</div> : <p className="text-xs text-muted-foreground">No published bundles are available.</p>}
+        {proframeCatalogueQ.isLoading ? <p className="text-xs text-muted-foreground">Loading bundles…</p> : proframeCatalogueQ.data?.length ? <div className="grid gap-3 sm:grid-cols-2">{proframeCatalogueQ.data.map((p:any)=><article key={p.id} className="rounded-xl border border-border bg-background/60 p-4"><div className="flex justify-between gap-2"><b>{p.name}</b><Badge variant="outline">Instant Funding</Badge></div><p className="mt-1 text-xs text-muted-foreground">{p.summary}</p><p className="mt-3 text-2xl font-bold text-amber-300">{p.version.currency} {Number(p.version.provider_account_size).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">account size</span></p><p className="text-sm">Activation fee: <b>{p.version.currency} {Number(p.version.price).toLocaleString()}</b></p><p className="mt-1 text-xs text-muted-foreground">Provider: <b className="text-foreground">{p.version.provider_name}</b></p><Button className="mt-3 w-full gold-gradient-btn" onClick={()=>{setCheckoutProduct(p);setCheckoutOpen(true)}}>Continue to checkout</Button></article>)}</div> : <p className="text-xs text-muted-foreground">No published bundles are available.</p>}
       </section>
       <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
         <DialogContent className="sm:max-w-md bg-card border-border">
