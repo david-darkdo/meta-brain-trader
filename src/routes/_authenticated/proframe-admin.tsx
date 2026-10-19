@@ -25,9 +25,17 @@ function ProframeAdmin() {
   const productsQ = useQuery({
     queryKey: ["proframe-admin-products"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("proframe_products").select("*, proframe_product_versions(*)").order("created_at", { ascending: false });
+      // Fetch catalogue rows and version rows separately so the seeded demo and
+      // every newly-created bundle remain visible even if PostgREST embedding changes.
+      const { data: products, error } = await supabase.from("proframe_products").select("*").order("created_at", { ascending: false });
       if (error) throw error;
-      return data ?? [];
+      const ids = (products ?? []).map((p: any) => p.id);
+      if (!ids.length) return [];
+      const { data: versions, error: versionError } = await supabase.from("proframe_product_versions").select("*").in("product_id", ids).order("version_number", { ascending: false });
+      if (versionError) throw versionError;
+      const grouped = new Map<string, any[]>();
+      for (const version of versions ?? []) grouped.set(version.product_id, [...(grouped.get(version.product_id) ?? []), version]);
+      return (products ?? []).map((p: any) => ({ ...p, proframe_product_versions: grouped.get(p.id) ?? [] }));
     },
   });
   const createProduct = useMutation({
