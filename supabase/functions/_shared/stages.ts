@@ -39,7 +39,8 @@ export type StrategyIdentity = {
 export type PromptOS = OrchestratorPromptOS;
 
 export type StageContext = {
-  trade: Record<string, unknown>;\n  authorizationToken: string;
+  trade: Record<string, unknown>;
+  authorizationToken: string;
   screenshotUrls: string[];
   strategyProfile: StrategyIdentity | null;
   promptOS: PromptOS | null;
