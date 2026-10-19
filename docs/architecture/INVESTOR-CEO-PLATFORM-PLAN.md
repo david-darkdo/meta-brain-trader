@@ -51,19 +51,20 @@ Build in small, vertical milestones. Each milestone includes the minimum databas
 - [x] Record current data counts and protect existing records.
 - [x] Identify architecture gaps before changing schema.
 
-### M1 — Role-aware application shell
-- [ ] Keep the public root route available to visitors and signed-in users.
-- [ ] Build role-aware navigation: Investor = Home / MetaFund / Community / Profile; CEO = Validator / MetaFund / Community / Profile, with a Homepage preview/action.
-- [ ] Gate every Validator route and private trade API/RPC to CEO/admin at the database/server boundary.
-- [ ] Add route tests for anonymous, investor and CEO access.
+### M1 — Role-aware application shell (passed)
+- [x] Keep the public root route available to visitors and signed-in users.
+- [x] Build role-aware navigation: Investor = Home / MetaFund / Community / Profile; CEO = Validator / MetaFund / Community / Profile, with a Homepage preview/action.
+- [x] Add server route-level investor restrictions for private trading pages; database/API authorization certification remains in M7.
+- [ ] Complete separate-user route and private API/RPC penetration tests.
 
-### M2 — Proframe domain model + catalogue
-- [ ] Add versioned Proframe products/plans and availability/status.
-- [ ] Add Proframe account instances with owner, product snapshot, lifecycle state, currency and risk policy.
-- [ ] Add an account-aware ledger/attribution layer while preserving investor-level reporting.
-- [ ] Add atomic, idempotent purchase operation and audit trail.
-- [ ] Build CEO product management and public catalogue UI.
-- [ ] Test purchase eligibility, insufficient balance, duplicate requests and account creation.
+### M2 — Proframe domain model + catalogue (in progress)
+- [x] Add versioned Proframe products/plans and availability/status, with RLS.
+- [x] Add Proframe account instance and purchase-order structures with owner, product-version snapshots, lifecycle state, currency and risk settings.
+- [x] Add operator-owned third-party Instant Funding account registry; store provider references only, never passwords.
+- [x] Build CEO Proframe Operations console for draft bundle creation, publishing/pausing and provider account recording.
+- [x] Add public homepage catalogue for published bundles and risk/eligibility disclosures.
+- [ ] Add a certified Main Account wallet/ledger debit bridge, atomic idempotent purchase RPC and audit trail before enabling live purchases.
+- [ ] Add provider-account assignment/fulfilment controls and tests for insufficient balance, duplicate requests, concurrency and account creation.
 
 ### M3 — Main Account and Proframe account experience
 - [ ] Extend account switcher and financial summary to return the selected account.
@@ -104,10 +105,8 @@ Build in small, vertical milestones. Each milestone includes the minimum databas
 - Do not add broker integrations, payment-gateway automation, subscriptions or unrelated features without a separate requirement.
 - Do not display unverified returns or promise that an account cannot lose money.
 
-## One required product rule before M2 database design
+## Confirmed Proframe commercial and accounting rule
 
-Confirm whether the amount paid to purchase a Proframe is:
-- **A.** the actual capital assigned to that Proframe trading account; or
-- **B.** a purchase/access fee, with trading capital funded separately.
+The user confirmed **Model B**: the Proframe purchase price is an activation/participation fee, not the trading capital and not investor-owned withdrawable cash. The operator separately procures the actual third-party Instant Funding account. The provider account's notional size, operator procurement cost, investor activation payment, trade performance and investor distributions must remain distinct in the data model and accounting. Profit distributions, when earned and approved under provider rules, are credited to the investor's Main Account. The activation fee must never be displayed as Proframe trading capital or as a withdrawable investor balance.
 
-This determines purchase accounting, account capital, withdrawals, loss limits and profit calculations. Do not guess.
+Live purchase/debit is intentionally not enabled yet. It must be implemented atomically against the certified Main Account balance calculation and double-entry accounting; do not substitute a provisional balance formula or debit the existing ledger until that bridge is verified.
