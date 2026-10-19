@@ -81,7 +81,7 @@ async function recordInsights(
   }
 }
 
-async function runPipeline(tradeId: string) {
+async function runPipeline(tradeId: string, accessToken: string) {
   const { data: trade, error: tErr } = await admin
     .from("trades")
     .select("*")
@@ -272,7 +272,7 @@ Deno.serve(async (req) => {
 
     // @ts-ignore EdgeRuntime is available in Supabase functions
     EdgeRuntime.waitUntil(
-      runPipeline(trade_id).catch((e) => console.error("post-trade pipeline error", e)),
+      runPipeline(trade_id, accessToken).catch((e) => console.error("post-trade pipeline error", e)),
     );
 
     return new Response(JSON.stringify({ status: "started" }), {
