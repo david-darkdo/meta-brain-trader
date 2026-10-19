@@ -1,4 +1,4 @@
-import { callAI, educationalBlock } from "./ai.ts";
+import { callAI, educationalBlock, type AICallOptions } from "./ai.ts";
 import {
   buildOrchestratedPrompt,
   type EngineKey,
@@ -39,7 +39,7 @@ export type StrategyIdentity = {
 export type PromptOS = OrchestratorPromptOS;
 
 export type StageContext = {
-  trade: Record<string, unknown>;
+  trade: Record<string, unknown>;\n  authorizationToken: string;
   screenshotUrls: string[];
   strategyProfile: StrategyIdentity | null;
   promptOS: PromptOS | null;
@@ -62,7 +62,7 @@ export async function runStage(stage: StageName, ctx: StageContext) {
   switch (stage) {
     case "BLIND":
       // Vision-only, deliberately no strategy context injected.
-      return callAI({
+      return ai({
         system:
           "You are a vision-only price action analyst. Analyze ONLY the chart screenshots provided. Do NOT use any text context, user notes, or trade plan. Report what you see structurally. Evaluate the complete chart context, formulate your deep reasoning, and emit both the complete analytical fields and concise decision-oriented fields (executive_headline, decision_summary, action_directive, bias_strength).",
         user: "Perform a blind chart analysis. Identify structure, key levels, candles, momentum.",
