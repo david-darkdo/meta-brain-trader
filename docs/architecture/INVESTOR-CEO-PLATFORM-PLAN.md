@@ -23,9 +23,9 @@ Build in small, vertical milestones. Each milestone includes the minimum databas
 2. **Investor homepage:** The root route is a redirect, not a public-facing firm homepage or Proframe catalogue.
 3. **Account model:** `investor_accounts` currently represents the existing normal investor account. There is no explicit account type / parent-child relationship for Main versus individually purchased Proframe accounts.
 4. **Proframe catalogue and purchase:** No product catalogue, purchasable Proframe plan, order, purchase RPC or purchase lifecycle exists.
-5. **Ledger attribution:** Current financial events and accounting are investor-level. Proframe requires every relevant balance movement and journal line to be attributable to the correct account and Proframe instance.
-6. **Trade allocation:** `trade_participations` currently references `investor_accounts` directly and defaults to 1% risk. It does not yet identify a Proframe account or enforce separate 2% Main / 0.5% Proframe risk policies.
-7. **Profit distribution:** Existing cycle close and 70/30 settlement foundation is for the current investor capital model. Proframe cycle profit must be settled to the investor's Main Account without confusing the Proframe's own capital, trading P&L, or the investor's distributable profit.
+5. **Ledger attribution:** Current financial events and accounting are investor-level. Proframe requires separate records for (a) investor payment/activation fee, (b) operator's third-party prop-firm purchase and related costs, (c) participation entitlement and linked prop-firm account, (d) trade-level performance allocation, and (e) profit distributions credited to the investor's Main Account. Never book the activation payment as the prop firm's trading balance or as investor-owned withdrawable capital.
+6. **Trade allocation:** `trade_participations` currently references `investor_accounts` directly and defaults to 1% risk. It does not yet identify a Proframe participation bundle / linked third-party prop-firm account or enforce separate 2% Main / 0.5% Proframe risk policies. One operator trade may generate separate, auditable performance allocations for eligible Main Account investors and Proframe participants.
+7. **Profit distribution:** Existing cycle close and 70/30 settlement foundation is for the current investor capital model. Proframe cycle profit must be calculated from eligible closed trades and the applicable third-party prop-firm payout/rule constraints, then the investor's agreed share credited to their Main Account. Do not confuse activation fees, operator-paid prop-firm fees, the prop firm's notional account balance, trading P&L, and investor distributable profit.
 8. **Community:** Community content, posts, lessons and announcements do not yet have a backend model.
 9. **Public performance claims:** Homepage metrics must be sourced from verified, approved records and clearly distinguish historical performance from targets or projections.
 
@@ -74,7 +74,7 @@ Build in small, vertical milestones. Each milestone includes the minimum databas
 ### M4 — Account-specific trading risk and allocations
 - [ ] Resolve risk basis and snapshot account type/risk policy at trade allocation time.
 - [ ] Enforce Main Account 2% and Proframe 0.5% as separate server-side policies.
-- [ ] Link each trade participation to the exact account / Proframe instance.
+- [ ] Link each trade participation to the exact investor participation and operator-procured third-party prop-firm account.
 - [ ] Preserve existing execution boundary and immutable allocation snapshots.
 - [ ] Test risk calculations, concurrent allocations and loss handling.
 
