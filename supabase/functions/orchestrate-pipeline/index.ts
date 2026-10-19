@@ -42,7 +42,7 @@ async function assertChartEvidence(tradeId: string) {
   }
 }
 
-async function runPipeline(tradeId: string) {
+async function runPipeline(tradeId: string, accessToken: string) {
   // Load trade
   const { data: trade, error: tErr } = await admin
     .from("trades")
