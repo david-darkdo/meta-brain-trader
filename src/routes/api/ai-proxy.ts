@@ -51,9 +51,28 @@ export const Route = createFileRoute("/api/ai-proxy")({
         if (tradeError || !trade) return fail("Trade not found or access denied.", 404);
 
         const schemaName = (body.schema_name || "emit_structured_output").replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 64);
-        const model = body.model || "gpt-4o";
         const content: Array<Record<string, unknown>> = [{ type: "text", text: body.user }];
         for (const url of body.images ?? []) content.push({ type: "image_url", image_url: { url } });
+
+        // Do not assume a model is enabled for this OpenAI project. Discover
+        // the models this exact key can access, then choose a vision + tools
+        // compatible model instead of repeatedly failing on a hard-coded ID.
+        const modelResponse = await fetch("https://api.openai.com/v1/models", {
+          headers: { Authorization: `Bearer ${openaiKey}` },
+        });
+        if (!modelResponse.ok) {
+          const details = await modelResponse.text();
+          console.error("[ai-proxy] OpenAI model discovery failed:", modelResponse.status, details.slice(0, 250));
+          return fail(`OpenAI model access check failed (${modelResponse.status}). Check the Vercel OPENAI_API_KEY project permissions.`, 502);
+        }
+        const modelPayload = await modelResponse.json();
+        const available = new Set<string>((modelPayload.data ?? []).map((item: { id: string }) => item.id));
+        const preferred = [body.model, "gpt-4.1-mini", "gpt-4o-mini", "gpt-4.1", "gpt-4o"];
+        const model = preferred.find((candidate) => candidate && available.has(candidate));
+        if (!model) {
+          console.error("[ai-proxy] No supported GPT model is enabled for this OpenAI project.");
+          return fail("This OpenAI project has no supported GPT model enabled. Enable GPT-4.1 mini or GPT-4o mini for the API project used by Vercel.", 503);
+        }
 
         const upstream = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
@@ -70,7 +89,7 @@ export const Route = createFileRoute("/api/ai-proxy")({
         if (!upstream.ok) {
           const errorText = await upstream.text();
           console.error("[ai-proxy] OpenAI request failed:", upstream.status, errorText.slice(0, 300));
-          return fail(`OpenAI request failed (${upstream.status}).`, upstream.status === 429 ? 429 : 502);
+          return fail(`OpenAI request failed (${upstream.status}): ${errorText.slice(0, 350)}`, upstream.status === 429 ? 429 : 502);
         }
         const payload = await upstream.json();
         const raw = payload?.choices?.[0]?.message?.tool_calls?.[0]?.function?.arguments;
