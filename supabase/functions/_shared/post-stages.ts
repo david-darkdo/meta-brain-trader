@@ -54,6 +54,12 @@ function sys(base: string, os: PromptOS | null, engines: EngineKey[]) {
 
 export async function runPostStage(stage: PostStageName, ctx: PostStageContext) {
   const os = ctx.promptOS;
+  const ai = (options: Omit<AICallOptions, "authorizationToken" | "tradeId">) =>
+    callAI({
+      ...options,
+      authorizationToken: ctx.authorizationToken,
+      tradeId: String(ctx.trade.trade_id),
+    });
   switch (stage) {
     case "REVIEW":
       return ai({
