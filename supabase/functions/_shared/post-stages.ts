@@ -100,7 +100,7 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
       });
 
     case "MISTAKE":
-      return callAI({
+      return ai({
         system: sys(
           "You identify mistakes and process errors in this trade. Tag each with a short canonical label from the Psychology + Filter engines. Produce both detailed root cause analysis and concise decision fields (executive_headline, decision_summary, primary_mistake_tag, action_directive).",
           os,
@@ -152,7 +152,7 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
       });
 
     case "PERFORMANCE":
-      return callAI({
+      return ai({
         system: sys(
           "You compute and interpret trade performance using numeric inputs. Identify strengths shown. Produce both detailed performance analysis and concise decision fields (executive_headline, decision_summary, r_multiple_rating, action_directive).",
           os,
@@ -207,7 +207,7 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
       });
 
     case "LEARNING_UPDATE":
-      return callAI({
+      return ai({
         system: sys(
           "You aggregate the last 24 trades plus this trade's mistakes and strengths to surface recurring patterns. Output canonical short labels suitable for tagging. Produce both detailed edge signals and concise decision fields (executive_headline, decision_summary, pattern_evolution_note, action_directive).",
           os,
@@ -271,7 +271,7 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
       });
 
     case "COACH_REPORT":
-      return callAI({
+      return ai({
         system: sys(
           "You are the MetaBrain head coach delivering the final post-trade report. Actionable, kind, specific. Produce the master post-trade executive decision summary, core lesson, top takeaway, and action directive alongside detailed coaching.",
           os,
