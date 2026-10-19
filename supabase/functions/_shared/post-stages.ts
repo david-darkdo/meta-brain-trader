@@ -3,7 +3,7 @@
 // constructed via the code-level Prompt Orchestration Engine (POSTTRADE
 // manifest) — Community, Investor, and Entry Confirmation are blocked here.
 
-import { callAI, educationalBlock } from "./ai.ts";
+import { callAI, educationalBlock, type AICallOptions } from "./ai.ts";
 import {
   buildOrchestratedPrompt,
   type EngineKey,
@@ -35,7 +35,7 @@ const baseSchema = (extra: Record<string, unknown>, required: string[]) => ({
 });
 
 export type PostStageContext = {
-  trade: Record<string, unknown>;
+  trade: Record<string, unknown>;\n  authorizationToken: string;
   result: Record<string, unknown> | null;
   reflections: Array<Record<string, unknown>>;
   priorPre: Record<string, unknown>;
@@ -55,7 +55,7 @@ export async function runPostStage(stage: PostStageName, ctx: PostStageContext) 
   const os = ctx.promptOS;
   switch (stage) {
     case "REVIEW":
-      return callAI({
+      return ai({
         system: sys(
           "You review what actually happened in the trade vs. the original plan and pre-trade analysis. Be objective and factual. Evaluate plan adherence and execution quality. Note: Strategy standard risk is 1%; compare actual risk to planned risk without normalizing numbers. Produce both detailed review and concise decision fields (executive_headline, decision_summary, execution_quality, action_directive).",
           os,
