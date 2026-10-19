@@ -101,7 +101,7 @@ export async function runStage(stage: StageName, ctx: StageContext) {
       });
 
     case "STRATEGY":
-      return callAI({
+      return ai({
         system: sys(
           "You evaluate the trade against the trader's Strategy OS. Apply EVERY rule verbatim from the engines below. Cite exact rule names when matched or violated. Distinguish confirmed evidence from assumptions. Evaluate matched, missing, and violated rules, and produce both detailed reasoning and concise decision fields (executive_headline, decision_summary, missing_rules, action_directive).",
           os,
@@ -143,7 +143,7 @@ export async function runStage(stage: StageName, ctx: StageContext) {
       });
 
     case "VALIDATION":
-      return callAI({
+      return ai({
         system: sys(
           "You validate trade setup quality (risk/reward, invalidation clarity, entry timing) strictly against the Risk Engine below. Note: Strategy Standard Risk is 1%. Compare actual risk to strategy risk without modifying the actual numbers. Produce both detailed validation and concise decision fields (executive_headline, decision_summary, risk_status, action_directive).",
           os,
@@ -187,7 +187,7 @@ export async function runStage(stage: StageName, ctx: StageContext) {
       });
 
     case "LEARNING":
-      return callAI({
+      return ai({
         system: sys(
           "You analyze the trader's recent history to surface relevant patterns from prior trades, following the Learning Engine directives. Evaluate historical edge, recurring strengths, and recurring mistakes. Produce both comprehensive analysis and concise decision fields (executive_headline, decision_summary, historical_warning, action_directive).",
           os,
@@ -231,7 +231,7 @@ export async function runStage(stage: StageName, ctx: StageContext) {
       });
 
     case "VERDICT":
-      return callAI({
+      return ai({
         system: sys(
           "You issue the final verdict integrating all prior stages (Blind, Strategy, Validation, Learning). Be decisive. Enforce the System Identity and Risk Engine authority. You must generate the authoritative Executive Decision: verdict, entry_score, executive_headline, decision_summary, and action_directive.",
           os,
@@ -270,7 +270,7 @@ export async function runStage(stage: StageName, ctx: StageContext) {
       });
 
     case "EDUCATION":
-      return callAI({
+      return ai({
         system: sys(
           "You generate an educational lesson around this setup, following the Education Engine directives. Produce both the detailed institutional lesson and concise takeaway fields (executive_headline, decision_summary, action_directive).",
           os,
@@ -309,7 +309,7 @@ export async function runStage(stage: StageName, ctx: StageContext) {
       });
 
     case "COACH":
-      return callAI({
+      return ai({
         system: sys(
           "You are the MetaBrain coach. Provide actionable, personal coaching notes guided by the Psychology Engine. Produce both empathetic detailed coaching and concise actionable decision fields (executive_headline, decision_summary, primary_mindset_anchor, action_directive).",
           os,
