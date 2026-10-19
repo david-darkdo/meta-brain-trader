@@ -79,3 +79,7 @@ create policy proframe_orders_admin_write on public.proframe_purchase_orders for
 grant select on public.proframe_products,public.proframe_product_versions to anon,authenticated;
 grant select on public.proframe_accounts,public.proframe_purchase_orders to authenticated;
 grant all on public.proframe_products,public.proframe_product_versions,public.proframe_provider_accounts,public.proframe_accounts,public.proframe_purchase_orders to authenticated;
+
+
+-- Independent currency for the external provider's funded account size.
+alter table public.proframe_product_versions add column if not exists provider_account_currency text not null default 'USD';
