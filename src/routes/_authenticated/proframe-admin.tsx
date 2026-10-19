@@ -40,25 +40,24 @@ function ProframeAdmin() {
   });
   const createProduct = useMutation({
     mutationFn: async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      const { data: p, error: pe } = await supabase.from("proframe_products").insert({
-        name: product.name.trim(), slug: product.slug.trim().toLowerCase(), summary: product.summary.trim(),
-        status: "DRAFT", created_by: auth.user?.id,
-      }).select("id").single();
-      if (pe) throw pe;
-      const { data: v, error: ve } = await supabase.from("proframe_product_versions").insert({
-        product_id: p.id, version_number: 1, price: Number(product.price), compare_at_price: product.compareAtPrice ? Number(product.compareAtPrice) : null, currency: product.currency,
-        provider_name: product.provider.trim(), account_type: "INSTANT_FUNDING",
-        provider_account_size: Number(product.size), max_drawdown_pct: Number(product.maxDd),
-        daily_drawdown_pct: Number(product.dailyDd), default_risk_pct: Number(product.risk),
-        payout_target_pct: Number(product.target), profit_split_investor_pct: Number(product.split),
-        terms_text: product.terms.trim(), created_by: auth.user?.id,
-      }).select("id").single();
-      if (ve) throw ve;
-      const { error: ue } = await supabase.from("proframe_products").update({ current_version_id: v.id }).eq("id", p.id);
-      if (ue) throw ue;
+      const { data, error } = await (supabase as any).rpc("create_proframe_bundle", {
+        p_name: product.name.trim(), p_slug: product.slug.trim().toLowerCase(),
+        p_summary: product.summary.trim(), p_provider_name: product.provider.trim(),
+        p_price: Number(product.price), p_compare_at_price: product.compareAtPrice ? Number(product.compareAtPrice) : null,
+        p_currency: product.currency, p_provider_account_size: Number(product.size),
+        p_max_drawdown_pct: Number(product.maxDd), p_daily_drawdown_pct: Number(product.dailyDd),
+        p_default_risk_pct: Number(product.risk), p_payout_target_pct: Number(product.target),
+        p_investor_profit_split_pct: Number(product.split), p_terms_text: product.terms.trim(),
+      });
+      if (error) throw error;
+      return data;
     },
-    onSuccess: () => { toast.success("Proframe draft created"); setProduct({ name: "", slug: "", summary: "", provider: "", price: "", compareAtPrice: "", currency: "USD", size: "100000", maxDd: "10", dailyDd: "5", risk: "0.5", target: "3", split: "70", terms: "" }); qc.invalidateQueries({ queryKey: ["proframe-admin-products"] }); },
+    onSuccess: () => {
+      toast.success("Proframe created and saved. It now appears below the editor.");
+      setProduct({ name: "", slug: "", summary: "", provider: "", price: "", compareAtPrice: "", currency: "USD", size: "100000", maxDd: "10", dailyDd: "5", risk: "0.5", target: "3", split: "70", terms: "" });
+      qc.invalidateQueries({ queryKey: ["proframe-admin-products"] });
+      qc.invalidateQueries({ queryKey: ["public-proframe-catalogue"] });
+    },
     onError: (e: any) => toast.error(e.message || "Could not create Proframe"),
   });
 
