@@ -74,8 +74,15 @@ function ProframeAdmin() {
   });
 
   const setProductStatus = async (id: string, status: string) => {
+    if (status === "ACTIVE") {
+      const { data: row, error: readError } = await supabase.from("proframe_products").select("current_version_id").eq("id", id).single();
+      if (readError) { toast.error(readError.message); return; }
+      if (!row.current_version_id) { toast.error("This bundle has no current version."); return; }
+      const { error: versionError } = await supabase.from("proframe_product_versions").update({ is_published: true }).eq("id", row.current_version_id);
+      if (versionError) { toast.error(versionError.message); return; }
+    }
     const { error } = await supabase.from("proframe_products").update({ status }).eq("id", id);
-    if (error) toast.error(error.message); else { toast.success("Catalogue status updated"); qc.invalidateQueries({ queryKey: ["proframe-admin-products"] }); }
+    if (error) toast.error(error.message); else { toast.success(status === "ACTIVE" ? "Bundle published to the public catalogue" : "Catalogue status updated"); qc.invalidateQueries({ queryKey: ["proframe-admin-products"] }); }
   };
 
   const field = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-amber-500";
