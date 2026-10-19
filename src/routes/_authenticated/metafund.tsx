@@ -89,6 +89,36 @@ function InvestorMetaFundDashboard() {
     refetchInterval: 15000,
   });
 
+  const [checkoutProduct, setCheckoutProduct] = useState<any>(null);
+  const [checkoutOpen, setCheckoutOpen] = useState(false);
+  const proframeCatalogueQ = useQuery({
+    queryKey: ["investor-proframe-catalogue"],
+    queryFn: async () => {
+      const { data: products, error } = await supabase.from("proframe_products").select("id,name,summary,current_version_id").eq("status","ACTIVE").order("display_order");
+      if (error) throw error;
+      const ids=(products??[]).map((p:any)=>p.current_version_id).filter(Boolean);
+      if (!ids.length) return [];
+      const { data: versions, error: ve }=await supabase.from("proframe_product_versions").select("id,price,currency,provider_account_size,default_risk_pct,payout_target_pct").in("id",ids).eq("is_published",true);
+      if(ve) throw ve;
+      const byId=new Map((versions??[]).map((v:any)=>[v.id,v]));
+      return (products??[]).map((p:any)=>({...p,version:byId.get(p.current_version_id)})).filter((p:any)=>p.version);
+    }
+  });
+  const purchaseProframeMutation = useMutation({
+    mutationFn: async (productId:string) => {
+      const {data,error}=await supabase.rpc("purchase_proframe_bundle",{p_product_id:productId,p_idempotency_key:crypto.randomUUID()});
+      if(error) throw error;
+      return data as any;
+    },
+    onSuccess: (result:any) => {
+      toast.success("Payment completed. Your Proframe is awaiting provider-account fulfilment.");
+      setCheckoutOpen(false); setCheckoutProduct(null);
+      qc.invalidateQueries({queryKey:["investor"]});
+      qc.invalidateQueries({queryKey:["investor-proframe-catalogue"]});
+    },
+    onError:(err:any)=>toast.error(err?.message||"Purchase could not be completed.")
+  });
+
   const investorId = summaryQ.data?.investor_id || null;
   const isAccountOnboarded = !!investorId;
   const paymentAccountsQ = useQuery({ queryKey: ["investor", "company_payment_accounts"], queryFn: fetchCompanyPaymentAccounts });
@@ -285,6 +315,23 @@ function InvestorMetaFundDashboard() {
 
   return (
     <div className="space-y-6">
+      <section className="rounded-2xl border border-amber-500/20 bg-card/50 p-4 sm:p-5 space-y-3">
+        <div><h2 className="text-lg font-bold">Proframe bundles</h2><p className="text-xs text-muted-foreground">Purchase using your Main Account balance or fund it externally first.</p></div>
+        {proframeCatalogueQ.isLoading ? <p className="text-xs text-muted-foreground">Loading bundles…</p> : proframeCatalogueQ.data?.length ? <div className="grid gap-3 sm:grid-cols-2">{proframeCatalogueQ.data.map((p:any)=><article key={p.id} className="rounded-xl border border-border bg-background/60 p-4"><div className="flex justify-between gap-2"><b>{p.name}</b><Badge variant="outline">Instant Funding</Badge></div><p className="mt-1 text-xs text-muted-foreground">{p.summary}</p><p className="mt-3 text-2xl font-bold text-amber-300">{p.version.currency} {Number(p.version.provider_account_size).toLocaleString()} <span className="text-xs font-normal text-muted-foreground">account size</span></p><p className="text-sm">Activation fee: <b>{p.version.currency} {Number(p.version.price).toLocaleString()}</b></p><Button className="mt-3 w-full gold-gradient-btn" onClick={()=>{setCheckoutProduct(p);setCheckoutOpen(true)}}>Purchase bundle</Button></article>)}</div> : <p className="text-xs text-muted-foreground">No published bundles are available.</p>}
+      </section>
+      <Dialog open={checkoutOpen} onOpenChange={setCheckoutOpen}>
+        <DialogContent className="sm:max-w-md bg-card border-border">
+          <DialogHeader><DialogTitle>Complete Proframe purchase</DialogTitle><DialogDescription>{checkoutProduct ? <>Activation fee: {checkoutProduct.version.currency} {Number(checkoutProduct.version.price).toLocaleString()}. This is a participation fee, not trading capital.</> : "Choose a payment method."}</DialogDescription></DialogHeader>
+          {checkoutProduct && <div className="space-y-3">
+            <div className="rounded-xl border border-border bg-secondary/30 p-3 text-sm flex justify-between"><span>Main Account available</span><b>{checkoutProduct.version.currency} {available.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</b></div>
+            <Button className="w-full gold-gradient-btn" disabled={purchaseProframeMutation.isPending || !investorId || checkoutProduct.version.currency !== (s?.currency || "USD") || available < Number(checkoutProduct.version.price)} onClick={()=>purchaseProframeMutation.mutate(checkoutProduct.id)}>{purchaseProframeMutation.isPending ? "Processing…" : "Pay with Main Account balance"}</Button>
+            {(checkoutProduct.version.currency !== (s?.currency || "USD") || available < Number(checkoutProduct.version.price)) && <p className="text-xs text-amber-400">Your available Main Account balance is insufficient or uses a different currency. Use external deposit.</p>}
+            <Button variant="outline" className="w-full" onClick={()=>{setDepositCurrency(checkoutProduct.version.currency);setDepositAmount(String(checkoutProduct.version.price));setDepositStep("details");setDepositIntentId(null);setIsDepositModalOpen(true);setCheckoutOpen(false)}}>Pay externally / Deposit with proof</Button>
+            <p className="text-[11px] text-muted-foreground">External deposits follow the existing payment instructions, proof upload and company verification process. A verified deposit does not automatically purchase the bundle; return here and confirm payment.</p>
+          </div>}
+        </DialogContent>
+      </Dialog>
+
       {/* 1. PLATFORM HEADER & USER ACTIONS */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
