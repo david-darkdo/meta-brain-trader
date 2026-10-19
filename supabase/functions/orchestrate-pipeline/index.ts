@@ -113,6 +113,7 @@ async function runPipeline(tradeId: string, accessToken: string) {
   const priorAnalyses: Record<string, unknown> = {};
   const ctx: StageContext = {
     trade,
+    authorizationToken: accessToken,
     screenshotUrls: signed,
     strategyProfile: profile,
     promptOS: promptOS ?? null,
@@ -291,7 +292,7 @@ Deno.serve(async (req) => {
     // Run in background so we can return immediately for realtime UX
     // @ts-ignore - EdgeRuntime available in Supabase functions
     EdgeRuntime.waitUntil(
-      runPipeline(trade_id).catch(async (e) => {
+      runPipeline(trade_id, accessToken).catch(async (e) => {
         const msg = e instanceof Error ? e.message : String(e);
         console.error("pipeline error", msg);
         await admin
