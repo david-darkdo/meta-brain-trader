@@ -3,7 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Plus, Package, Server, RefreshCw } from "lucide-react";
+import { Plus, Package, RefreshCw } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/proframe-admin")({
   ssr: false,
@@ -21,7 +21,6 @@ function ProframeAdmin() {
   const [product, setProduct] = useState({ name: "", slug: "", summary: "", provider: "", price: "", compareAtPrice: "", currency: "USD", size: "100000", maxDd: "10", dailyDd: "5", risk: "0.5", target: "3", split: "70", terms: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editVersion, setEditVersion] = useState<any>(null);
-  const [provider, setProvider] = useState({ provider_name: "", account_reference: "", account_size: "100000", currency: "USD", procurement_cost: "0", procurement_currency: "USD", status: "AVAILABLE", operator_mt_reference: "", notes: "" });
 
   const productsQ = useQuery({
     queryKey: ["proframe-admin-products"],
@@ -31,15 +30,6 @@ function ProframeAdmin() {
       return data ?? [];
     },
   });
-  const providersQ = useQuery({
-    queryKey: ["proframe-admin-providers"],
-    queryFn: async () => {
-      const { data, error } = await supabase.from("proframe_provider_accounts").select("*").order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
   const createProduct = useMutation({
     mutationFn: async () => {
       const { data: auth } = await supabase.auth.getUser();
@@ -102,17 +92,6 @@ function ProframeAdmin() {
     qc.invalidateQueries({ queryKey: ["public-proframe-catalogue"] });
   };
 
-  const saveProvider = useMutation({
-    mutationFn: async () => {
-      const { data: auth } = await supabase.auth.getUser();
-      const { error } = await supabase.from("proframe_provider_accounts").insert({ ...provider,
-        account_size: Number(provider.account_size), procurement_cost: Number(provider.procurement_cost), created_by: auth.user?.id });
-      if (error) throw error;
-    },
-    onSuccess: () => { toast.success("Provider account recorded"); setProvider({ provider_name: "", account_reference: "", account_size: "100000", currency: "USD", procurement_cost: "0", procurement_currency: "USD", status: "AVAILABLE", operator_mt_reference: "", notes: "" }); qc.invalidateQueries({ queryKey: ["proframe-admin-providers"] }); },
-    onError: (e: any) => toast.error(e.message || "Could not save provider account"),
-  });
-
   const setProductStatus = async (id: string, status: string) => {
     if (status === "ACTIVE") {
       const { data: row, error: readError } = await supabase.from("proframe_products").select("current_version_id").eq("id", id).single();
@@ -128,12 +107,11 @@ function ProframeAdmin() {
   const field = "w-full rounded-lg border border-border bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-amber-500";
   const label = "mb-1 block text-xs font-medium text-muted-foreground";
   const products = productsQ.data ?? [];
-  const accounts = providersQ.data ?? [];
 
   return <div className="space-y-6">
     <div className="flex items-start justify-between gap-3">
-      <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-400">CEO Command Center</p><h1 className="mt-1 text-2xl font-bold">Proframe Operations</h1><p className="mt-1 text-sm text-muted-foreground">Manage public bundles and operator-owned Instant Funding accounts.</p></div>
-      <button onClick={() => { qc.invalidateQueries({ queryKey: ["proframe-admin-products"] }); qc.invalidateQueries({ queryKey: ["proframe-admin-providers"] }); }} className="rounded-lg border border-border p-2" aria-label="Refresh"><RefreshCw className="h-4 w-4"/></button>
+      <div><p className="text-xs font-semibold uppercase tracking-[0.2em] text-amber-400">CEO Command Center</p><h1 className="mt-1 text-2xl font-bold">Proframe Operations</h1><p className="mt-1 text-sm text-muted-foreground">Create and manage published Proframe bundles.</p></div>
+      <button onClick={() => { qc.invalidateQueries({ queryKey: ["proframe-admin-products"] }); }} className="rounded-lg border border-border p-2" aria-label="Refresh"><RefreshCw className="h-4 w-4"/></button>
     </div>
 
     <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
@@ -152,32 +130,16 @@ function ProframeAdmin() {
         <div><label className={label}>Payout eligibility target %</label><input className={field} type="number" min="0.01" max="100" step="0.01" value={product.target} onChange={e=>setProduct({...product,target:e.target.value})}/></div>
         <div><label className={label}>Investor profit share %</label><input className={field} type="number" min="0" max="100" step="0.01" value={product.split} onChange={e=>setProduct({...product,split:e.target.value})}/></div>
         <div className="sm:col-span-2"><label className={label}>Provider rules and participation terms</label><textarea className={field} rows={3} value={product.terms} onChange={e=>setProduct({...product,terms:e.target.value})} placeholder="Document provider-specific payout conditions, restrictions and fees."/></div>
-        <div className="sm:col-span-2 flex justify-end"><button disabled={createProduct.isPending} className="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-black disabled:opacity-50">{createProduct.isPending ? "Saving…" : "Save draft bundle"}</button></div>
+        <div className="sm:col-span-2 flex justify-end"><button disabled={createProduct.isPending} className="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-black disabled:opacity-50">{createProduct.isPending ? "Creating…" : "Create Proframe"}</button></div>
       </form>
-      <p className="mt-3 text-xs text-muted-foreground">Bundle details and the external prop-firm provider are saved together with one button. New bundles remain drafts until published. Purchased provider accounts are recorded separately after procurement.</p>
+      <p className="mt-3 text-xs text-muted-foreground">Provider is saved as part of the Proframe bundle. New bundles remain drafts until published.</p>
     </section>
 
     <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
       <div className="mb-4 flex items-center gap-2"><Package className="h-5 w-5 text-amber-400"/><h2 className="font-semibold">Catalogue management</h2></div>
-      {productsQ.isLoading ? <p className="text-sm text-muted-foreground">Loading bundles…</p> : products.length===0 ? <p className="text-sm text-muted-foreground">No Proframe bundles created yet.</p> : <div className="space-y-3">{products.map((p:any)=><div key={p.id} className="rounded-xl border border-border p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{p.name}</p><p className="text-xs text-muted-foreground">{p.slug} · {p.proframe_product_versions?.length ?? 0} version(s) · {p.status}</p></div><div className="flex gap-2"><button onClick={()=>beginEdit(p)} className="rounded-lg border border-border px-3 py-2 text-xs">Edit</button>{p.status!=="ACTIVE" ? <button onClick={()=>setProductStatus(p.id,"ACTIVE")} className="rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-black">Publish</button> : <button onClick={()=>setProductStatus(p.id,"PAUSED")} className="rounded-lg border border-border px-3 py-2 text-xs">Pause</button>}</div></div>{editingId===p.id && editVersion && <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2">{[["name","Bundle name"],["slug","URL slug"],["summary","Description"],["provider","Provider"],["price","Activation fee"],["compareAtPrice","Was price (crossed out)"],["currency","Currency"],["size","Provider account size"],["maxDd","Maximum drawdown %"],["dailyDd","Daily drawdown %"],["risk","Per-trade risk %"],["target","Payout eligibility target %"],["split","Investor profit share %"]].map(([key,title])=><label key={key} className="text-xs text-muted-foreground">{title}<input className={field+" mt-1"} value={editVersion[key]} onChange={e=>setEditVersion({...editVersion,[key]:e.target.value})}/></label>)}<label className="sm:col-span-2 text-xs text-muted-foreground">Terms and provider rules<textarea className={field+" mt-1"} rows={3} value={editVersion.terms} onChange={e=>setEditVersion({...editVersion,terms:e.target.value})}/></label><div className="sm:col-span-2 flex justify-end gap-2"><button onClick={()=>{setEditingId(null);setEditVersion(null)}} className="rounded-lg border border-border px-3 py-2 text-xs">Cancel</button><button onClick={saveEditedVersion} className="rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-black">Save new version</button></div><p className="sm:col-span-2 text-xs text-muted-foreground">Edits create a new version; previous pricing and rules are preserved for audit.</p></div>}</div>)}</div>}
+      {productsQ.isLoading ? <p className="text-sm text-muted-foreground">Loading bundles…</p> : products.length===0 ? <p className="text-sm text-muted-foreground">No Proframe bundles created yet.</p> : <div className="space-y-3">{products.map((p:any)=><div key={p.id} className="rounded-xl border border-border p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{p.name}</p><p className="text-xs text-muted-foreground">Provider: {(p.proframe_product_versions ?? []).find((v:any)=>v.id===p.current_version_id)?.provider_name ?? "—"} · {p.slug} · {p.proframe_product_versions?.length ?? 0} version(s) · {p.status}</p></div><div className="flex gap-2"><button onClick={()=>beginEdit(p)} className="rounded-lg border border-border px-3 py-2 text-xs">Edit</button>{p.status!=="ACTIVE" ? <button onClick={()=>setProductStatus(p.id,"ACTIVE")} className="rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-black">Publish</button> : <button onClick={()=>setProductStatus(p.id,"PAUSED")} className="rounded-lg border border-border px-3 py-2 text-xs">Pause</button>}</div></div>{editingId===p.id && editVersion && <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2">{[["name","Bundle name"],["slug","URL slug"],["summary","Description"],["provider","Provider"],["price","Activation fee"],["compareAtPrice","Was price (crossed out)"],["currency","Currency"],["size","Provider account size"],["maxDd","Maximum drawdown %"],["dailyDd","Daily drawdown %"],["risk","Per-trade risk %"],["target","Payout eligibility target %"],["split","Investor profit share %"]].map(([key,title])=><label key={key} className="text-xs text-muted-foreground">{title}<input className={field+" mt-1"} value={editVersion[key]} onChange={e=>setEditVersion({...editVersion,[key]:e.target.value})}/></label>)}<label className="sm:col-span-2 text-xs text-muted-foreground">Terms and provider rules<textarea className={field+" mt-1"} rows={3} value={editVersion.terms} onChange={e=>setEditVersion({...editVersion,terms:e.target.value})}/></label><div className="sm:col-span-2 flex justify-end gap-2"><button onClick={()=>{setEditingId(null);setEditVersion(null)}} className="rounded-lg border border-border px-3 py-2 text-xs">Cancel</button><button onClick={saveEditedVersion} className="rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-black">Save new version</button></div><p className="sm:col-span-2 text-xs text-muted-foreground">Edits create a new version; previous pricing and rules are preserved for audit.</p></div>}</div>)}</div>}
     </section>
 
-    <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
-      <div className="mb-4 flex items-center gap-2"><Server className="h-5 w-5 text-amber-400"/><h2 className="font-semibold">Operator provider accounts</h2></div>
-      <form className="grid gap-3 sm:grid-cols-2" onSubmit={e=>{e.preventDefault();saveProvider.mutate();}}>
-        <div><label className={label}>Provider</label><input className={field} required value={provider.provider_name} onChange={e=>setProvider({...provider,provider_name:e.target.value})}/></div>
-        <div><label className={label}>Provider account reference (no password)</label><input className={field} required value={provider.account_reference} onChange={e=>setProvider({...provider,account_reference:e.target.value})}/></div>
-        <div><label className={label}>Account size</label><input className={field} type="number" min="1" value={provider.account_size} onChange={e=>setProvider({...provider,account_size:e.target.value})}/></div>
-        <div><label className={label}>Currency</label><select className={field} value={provider.currency} onChange={e=>setProvider({...provider,currency:e.target.value})}><option>USD</option><option>NGN</option><option>EUR</option><option>GBP</option></select></div>
-        <div><label className={label}>Operator procurement cost</label><input className={field} type="number" min="0" step="0.01" value={provider.procurement_cost} onChange={e=>setProvider({...provider,procurement_cost:e.target.value})}/></div>
-        <div><label className={label}>Procurement currency</label><select className={field} value={provider.procurement_currency} onChange={e=>setProvider({...provider,procurement_currency:e.target.value})}><option>USD</option><option>NGN</option><option>EUR</option><option>GBP</option></select></div>
-        <div><label className={label}>MetaTrader operator reference</label><input className={field} value={provider.operator_mt_reference} onChange={e=>setProvider({...provider,operator_mt_reference:e.target.value})}/></div>
-        <div><label className={label}>Status</label><select className={field} value={provider.status} onChange={e=>setProvider({...provider,status:e.target.value})}><option>AVAILABLE</option><option>ORDERED</option><option>ACTIVE</option></select></div>
-        <div className="sm:col-span-2"><label className={label}>Notes</label><textarea className={field} rows={2} value={provider.notes} onChange={e=>setProvider({...provider,notes:e.target.value})}/></div>
-        <div className="sm:col-span-2 flex justify-end"><button disabled={saveProvider.isPending} className="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-black disabled:opacity-50">{saveProvider.isPending ? "Saving…" : "Record provider account"}</button></div>
-      </form>
-      <div className="mt-5 space-y-2">{providersQ.isLoading ? <p className="text-sm text-muted-foreground">Loading provider accounts…</p> : accounts.length===0 ? <p className="text-sm text-muted-foreground">No provider accounts recorded.</p> : accounts.map((a:any)=><div key={a.id} className="flex flex-wrap justify-between gap-2 rounded-lg border border-border px-3 py-2 text-sm"><span>{a.provider_name} · {a.account_reference} · {Number(a.account_size).toLocaleString()} {a.currency}</span><span className="text-xs text-muted-foreground">{a.status} · procurement {Number(a.procurement_cost).toLocaleString()} {a.procurement_currency}</span></div>)}</div>
-    </section>
     <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 text-xs leading-5 text-muted-foreground">Safety boundary: activation fees are not investor trading capital. Provider accounts and procurement costs belong to the operator. Live purchase/debit is intentionally not enabled in this slice until it is wired atomically into the certified Main Account ledger.</div>
   </div>;
 }
