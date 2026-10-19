@@ -18,7 +18,7 @@ export const Route = createFileRoute("/_authenticated/proframe-admin")({
 
 function ProframeAdmin() {
   const qc = useQueryClient();
-  const [product, setProduct] = useState({ name: "", slug: "", summary: "", provider: "", price: "", currency: "USD", size: "100000", maxDd: "10", dailyDd: "5", risk: "0.5", target: "3", split: "70", terms: "" });
+  const [product, setProduct] = useState({ name: "", slug: "", summary: "", provider: "", price: "", compareAtPrice: "", currency: "USD", size: "100000", maxDd: "10", dailyDd: "5", risk: "0.5", target: "3", split: "70", terms: "" });
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editVersion, setEditVersion] = useState<any>(null);
   const [provider, setProvider] = useState({ provider_name: "", account_reference: "", account_size: "100000", currency: "USD", procurement_cost: "0", procurement_currency: "USD", status: "AVAILABLE", operator_mt_reference: "", notes: "" });
@@ -49,7 +49,7 @@ function ProframeAdmin() {
       }).select("id").single();
       if (pe) throw pe;
       const { data: v, error: ve } = await supabase.from("proframe_product_versions").insert({
-        product_id: p.id, version_number: 1, price: Number(product.price), currency: product.currency,
+        product_id: p.id, version_number: 1, price: Number(product.price), compare_at_price: product.compareAtPrice ? Number(product.compareAtPrice) : null, currency: product.currency,
         provider_name: product.provider.trim(), account_type: "INSTANT_FUNDING",
         provider_account_size: Number(product.size), max_drawdown_pct: Number(product.maxDd),
         daily_drawdown_pct: Number(product.dailyDd), default_risk_pct: Number(product.risk),
@@ -60,7 +60,7 @@ function ProframeAdmin() {
       const { error: ue } = await supabase.from("proframe_products").update({ current_version_id: v.id }).eq("id", p.id);
       if (ue) throw ue;
     },
-    onSuccess: () => { toast.success("Proframe draft created"); setProduct({ name: "", slug: "", summary: "", provider: "", price: "", currency: "USD", size: "100000", maxDd: "10", dailyDd: "5", risk: "0.5", target: "3", split: "70", terms: "" }); qc.invalidateQueries({ queryKey: ["proframe-admin-products"] }); },
+    onSuccess: () => { toast.success("Proframe draft created"); setProduct({ name: "", slug: "", summary: "", provider: "", price: "", compareAtPrice: "", currency: "USD", size: "100000", maxDd: "10", dailyDd: "5", risk: "0.5", target: "3", split: "70", terms: "" }); qc.invalidateQueries({ queryKey: ["proframe-admin-products"] }); },
     onError: (e: any) => toast.error(e.message || "Could not create Proframe"),
   });
 
@@ -69,7 +69,7 @@ function ProframeAdmin() {
     if (!v) { toast.error("Current bundle version was not found."); return; }
     setEditingId(p.id);
     setEditVersion({ name: p.name, slug: p.slug, summary: p.summary ?? "", provider: v.provider_name,
-      price: String(v.price), currency: v.currency, size: String(v.provider_account_size),
+      price: String(v.price), compareAtPrice: v.compare_at_price == null ? "" : String(v.compare_at_price), currency: v.currency, size: String(v.provider_account_size),
       maxDd: String(v.max_drawdown_pct), dailyDd: String(v.daily_drawdown_pct),
       risk: String(v.default_risk_pct), target: String(v.payout_target_pct),
       split: String(v.profit_split_investor_pct), terms: v.terms_text ?? "" });
@@ -82,7 +82,7 @@ function ProframeAdmin() {
     const versions = current.proframe_product_versions ?? [];
     const nextVersion = Math.max(0, ...versions.map((v: any) => Number(v.version_number))) + 1;
     const { data: v, error: ve } = await supabase.from("proframe_product_versions").insert({
-      product_id: editingId, version_number: nextVersion, price: Number(editVersion.price),
+      product_id: editingId, version_number: nextVersion, price: Number(editVersion.price), compare_at_price: editVersion.compareAtPrice ? Number(editVersion.compareAtPrice) : null,
       currency: editVersion.currency, provider_name: editVersion.provider.trim(),
       account_type: "INSTANT_FUNDING", provider_account_size: Number(editVersion.size),
       max_drawdown_pct: Number(editVersion.maxDd), daily_drawdown_pct: Number(editVersion.dailyDd),
@@ -143,7 +143,7 @@ function ProframeAdmin() {
         <div><label className={label}>Unique URL slug</label><input className={field} required value={product.slug} onChange={e=>setProduct({...product,slug:e.target.value})} placeholder="proframe-100k"/></div>
         <div><label className={label}>Short description</label><input className={field} value={product.summary} onChange={e=>setProduct({...product,summary:e.target.value})} placeholder="Instant Funding participation"/></div>
         <div><label className={label}>Funding provider</label><input className={field} required value={product.provider} onChange={e=>setProduct({...product,provider:e.target.value})} placeholder="Provider name"/></div>
-        <div><label className={label}>Activation price</label><input className={field} type="number" min="0.01" step="0.01" required value={product.price} onChange={e=>setProduct({...product,price:e.target.value})}/></div>
+        <div><label className={label}>Activation fee (charged to Main Account)</label><input className={field} type="number" min="0.01" step="0.01" required value={product.price} onChange={e=>setProduct({...product,price:e.target.value})}/></div><div><label className={label}>Was price / crossed-out price</label><input className={field} type="number" min="0" step="0.01" value={product.compareAtPrice} onChange={e=>setProduct({...product,compareAtPrice:e.target.value})} placeholder="45000"/></div>
         <div><label className={label}>Currency</label><select className={field} value={product.currency} onChange={e=>setProduct({...product,currency:e.target.value})}><option>USD</option><option>NGN</option><option>EUR</option><option>GBP</option></select></div>
         <div><label className={label}>Provider account size</label><input className={field} type="number" min="1" value={product.size} onChange={e=>setProduct({...product,size:e.target.value})}/></div>
         <div><label className={label}>Maximum drawdown %</label><input className={field} type="number" min="0.01" max="100" step="0.01" value={product.maxDd} onChange={e=>setProduct({...product,maxDd:e.target.value})}/></div>
@@ -154,12 +154,12 @@ function ProframeAdmin() {
         <div className="sm:col-span-2"><label className={label}>Provider rules and participation terms</label><textarea className={field} rows={3} value={product.terms} onChange={e=>setProduct({...product,terms:e.target.value})} placeholder="Document provider-specific payout conditions, restrictions and fees."/></div>
         <div className="sm:col-span-2 flex justify-end"><button disabled={createProduct.isPending} className="rounded-xl bg-amber-400 px-5 py-2.5 text-sm font-bold text-black disabled:opacity-50">{createProduct.isPending ? "Saving…" : "Save draft bundle"}</button></div>
       </form>
-      <p className="mt-3 text-xs text-muted-foreground">New bundles are drafts and are not visible to investors until you publish them. Each saved bundle starts with immutable version 1 terms.</p>
+      <p className="mt-3 text-xs text-muted-foreground">Bundle details and the external prop-firm provider are saved together with one button. New bundles remain drafts until published. Purchased provider accounts are recorded separately after procurement.</p>
     </section>
 
     <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
       <div className="mb-4 flex items-center gap-2"><Package className="h-5 w-5 text-amber-400"/><h2 className="font-semibold">Catalogue management</h2></div>
-      {productsQ.isLoading ? <p className="text-sm text-muted-foreground">Loading bundles…</p> : products.length===0 ? <p className="text-sm text-muted-foreground">No Proframe bundles created yet.</p> : <div className="space-y-3">{products.map((p:any)=><div key={p.id} className="rounded-xl border border-border p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{p.name}</p><p className="text-xs text-muted-foreground">{p.slug} · {p.proframe_product_versions?.length ?? 0} version(s) · {p.status}</p></div><div className="flex gap-2"><button onClick={()=>beginEdit(p)} className="rounded-lg border border-border px-3 py-2 text-xs">Edit</button>{p.status!=="ACTIVE" ? <button onClick={()=>setProductStatus(p.id,"ACTIVE")} className="rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-black">Publish</button> : <button onClick={()=>setProductStatus(p.id,"PAUSED")} className="rounded-lg border border-border px-3 py-2 text-xs">Pause</button>}</div></div>{editingId===p.id && editVersion && <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2">{[["name","Bundle name"],["slug","URL slug"],["summary","Description"],["provider","Provider"],["price","Activation fee"],["currency","Currency"],["size","Provider account size"],["maxDd","Maximum drawdown %"],["dailyDd","Daily drawdown %"],["risk","Per-trade risk %"],["target","Payout eligibility target %"],["split","Investor profit share %"]].map(([key,title])=><label key={key} className="text-xs text-muted-foreground">{title}<input className={field+" mt-1"} value={editVersion[key]} onChange={e=>setEditVersion({...editVersion,[key]:e.target.value})}/></label>)}<label className="sm:col-span-2 text-xs text-muted-foreground">Terms and provider rules<textarea className={field+" mt-1"} rows={3} value={editVersion.terms} onChange={e=>setEditVersion({...editVersion,terms:e.target.value})}/></label><div className="sm:col-span-2 flex justify-end gap-2"><button onClick={()=>{setEditingId(null);setEditVersion(null)}} className="rounded-lg border border-border px-3 py-2 text-xs">Cancel</button><button onClick={saveEditedVersion} className="rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-black">Save new version</button></div><p className="sm:col-span-2 text-xs text-muted-foreground">Edits create a new version; previous pricing and rules are preserved for audit.</p></div>}</div>)}</div>}
+      {productsQ.isLoading ? <p className="text-sm text-muted-foreground">Loading bundles…</p> : products.length===0 ? <p className="text-sm text-muted-foreground">No Proframe bundles created yet.</p> : <div className="space-y-3">{products.map((p:any)=><div key={p.id} className="rounded-xl border border-border p-3"><div className="flex flex-wrap items-center justify-between gap-3"><div><p className="font-semibold">{p.name}</p><p className="text-xs text-muted-foreground">{p.slug} · {p.proframe_product_versions?.length ?? 0} version(s) · {p.status}</p></div><div className="flex gap-2"><button onClick={()=>beginEdit(p)} className="rounded-lg border border-border px-3 py-2 text-xs">Edit</button>{p.status!=="ACTIVE" ? <button onClick={()=>setProductStatus(p.id,"ACTIVE")} className="rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-black">Publish</button> : <button onClick={()=>setProductStatus(p.id,"PAUSED")} className="rounded-lg border border-border px-3 py-2 text-xs">Pause</button>}</div></div>{editingId===p.id && editVersion && <div className="mt-4 grid gap-3 border-t border-border pt-4 sm:grid-cols-2">{[["name","Bundle name"],["slug","URL slug"],["summary","Description"],["provider","Provider"],["price","Activation fee"],["compareAtPrice","Was price (crossed out)"],["currency","Currency"],["size","Provider account size"],["maxDd","Maximum drawdown %"],["dailyDd","Daily drawdown %"],["risk","Per-trade risk %"],["target","Payout eligibility target %"],["split","Investor profit share %"]].map(([key,title])=><label key={key} className="text-xs text-muted-foreground">{title}<input className={field+" mt-1"} value={editVersion[key]} onChange={e=>setEditVersion({...editVersion,[key]:e.target.value})}/></label>)}<label className="sm:col-span-2 text-xs text-muted-foreground">Terms and provider rules<textarea className={field+" mt-1"} rows={3} value={editVersion.terms} onChange={e=>setEditVersion({...editVersion,terms:e.target.value})}/></label><div className="sm:col-span-2 flex justify-end gap-2"><button onClick={()=>{setEditingId(null);setEditVersion(null)}} className="rounded-lg border border-border px-3 py-2 text-xs">Cancel</button><button onClick={saveEditedVersion} className="rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-black">Save new version</button></div><p className="sm:col-span-2 text-xs text-muted-foreground">Edits create a new version; previous pricing and rules are preserved for audit.</p></div>}</div>)}</div>}
     </section>
 
     <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
